@@ -8,16 +8,21 @@
 
 ## Part 1 — Student Information
 | Name | Student ID | Date | Group |
-|---|---|---|---|
+|Neree Boonxharoen|6631503018|---|---|
 | | | | |
 
 ## Part 2 — Lecture Questions
 Answer in your own words (2–4 sentences each).
 1. Define the CIA triad and give one concrete failure example for each of the three properties.
+Ans. Confidentiality, Integrity, and Availability. Examples: data leakage, data modification, and system downtime.
 2. What is a *trust boundary*, and why does data crossing one deserve extra scrutiny?
+Ans.A point where data crosses between different trust levels. It needs extra checking to prevent attacks.
 3. Explain "attack surface." Name two things that increase it in a web app.
+Ans.All possible points an attacker can target. More APIs and unnecessary services increase it.
 4. What does each STRIDE letter map to, and which security property does each threat violate?
+Ans.Spoofing–Authentication, Tampering–Integrity, Repudiation–Accountability, Information Disclosure–Confidentiality, Denial of Service–Availability, Elevation of Privilege–Authorization.
 5. What does "Secure by Design" (CISA) mean, and how does it differ from bolting security on after release?
+Ans.Security is built into the system from the beginning. It is better than adding security fixes after release.
 
 ## Part 3 — Hands-on Lab (180 min)
 **Learning goals:** build a data-flow diagram (DFD), apply STRIDE to a real Flask app, rank risks, and propose mitigations.

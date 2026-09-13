@@ -8,7 +8,7 @@
 
 ## Part 1 — Student Information
 | Name | Student ID | Date | Group |
-|---|---|---|---|
+|Neree Booncharoen|6631503018|9-9-2026|---|
 | | | | |
 
 ## Part 2 — Lecture Questions
