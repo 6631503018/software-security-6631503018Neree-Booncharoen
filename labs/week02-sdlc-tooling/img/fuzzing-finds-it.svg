@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" role="img" aria-label="How a coverage-guided fuzzer discovers the bug that a static analyzer misses, using the Week 2 harness. The target is a function with four nested checks: if byte zero is F, then byte one is U, then byte two is Z, then byte three is Z, it traps; but the byte-three check has no size-greater-than-three guard, so when the input is exactly the three bytes F U Z, reading byte three runs one byte past the buffer and AddressSanitizer reports a heap buffer overflow. A static analyzer reads the code and does not flag this: the path looks reachable and ordinary, and it cannot know the input will ever be exactly F U Z. A coverage-guided fuzzer finds it by running: it mutates inputs and is rewarded whenever a new branch is reached, so instead of blindly guessing it climbs the nested checks one at a time — random bytes, then something starting with F, then F U, then F U Z — and the moment it reaches F U Z the unguarded byte-three read crashes under AddressSanitizer, which writes a crash reproducer file. Bottom line: static tools read the code and miss input-dependent memory bugs; a coverage-guided fuzzer plus a sanitizer discovers them by executing mutated inputs, which is why the two are complements, not substitutes.">
+<title>Fuzzing finds what SAST misses — coverage-guided mutation reaches an unguarded out-of-bounds read (Week 2)</title>
+<style>
+  text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .bg{fill:#ffffff;} .ttl{fill:#111827;font-size:16px;font-weight:700;} .sub{fill:#6b7280;font-size:11.5px;}
+  .step{fill:#E35205;font-size:12px;font-weight:700;} .stepb{fill:#017BC4;font-size:12px;font-weight:700;}
+  .note{fill:#6b7280;font-size:11px;} .noteo{fill:#E35205;font-size:11px;font-weight:600;} .noteb{fill:#017BC4;font-size:11px;font-weight:600;}
+  .row{fill:#fafafa;stroke:#e5e7eb;stroke-width:1;} .rowf{fill:#f1f8fd;stroke:#017BC4;stroke-width:1.4;}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;fill:#111827;}
+  .monod{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;fill:#6b7280;}
+  .monoo{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;fill:#E35205;font-weight:700;}
+  .chip{fill:#f1f8fd;stroke:#017BC4;stroke-width:1.3;} .chipt{font-family:ui-monospace,monospace;font-size:12px;fill:#017BC4;font-weight:700;}
+  .chipc{fill:#fff1ea;stroke:#E35205;stroke-width:1.6;} .chipct{font-family:ui-monospace,monospace;font-size:12px;fill:#E35205;font-weight:700;}
+  .bad{fill:#E35205;font-size:11px;font-weight:700;} .ok{fill:#017BC4;font-size:11px;font-weight:700;}
+  .arr{stroke:#017BC4;fill:none;stroke-width:1.8;} .mk{fill:#017BC4;}
+  @media (prefers-color-scheme: dark) {
+    .bg{fill:#11151a;} .ttl{fill:#e9edf2;} .sub{fill:#9aa3ad;} .note{fill:#9aa3ad;}
+    .step{fill:#ff7a3d;} .stepb{fill:#4aa3dd;} .noteo{fill:#ff7a3d;} .noteb{fill:#4aa3dd;}
+    .row{fill:#171c22;stroke:#2b333c;} .rowf{fill:#122633;stroke:#4aa3dd;}
+    .mono{fill:#e9edf2;} .monod{fill:#9aa3ad;} .monoo{fill:#ff7a3d;}
+    .chip{fill:#122633;stroke:#4aa3dd;} .chipt{fill:#4aa3dd;} .chipc{fill:#2b1a12;stroke:#ff7a3d;} .chipct{fill:#ff7a3d;}
+    .bad{fill:#ff7a3d;} .ok{fill:#4aa3dd;} .arr{stroke:#4aa3dd;} .mk{fill:#4aa3dd;}
+  }
+</style>
+<defs>
+  <marker id="a" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" refX="8.5" refY="5" orient="auto"><path class="mk" d="M0,0.8 L8.5,5 L0,9.2 Z"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="760" height="470"/>
+<text class="ttl" x="20" y="30">Fuzzing finds what SAST misses</text>
+<text class="sub" x="20" y="49">Week 2 · coverage-guided fuzzing · the libFuzzer harness in harness.c</text>
+
+<!-- target -->
+<rect class="row" x="20" y="66" width="720" height="118" rx="8"/>
+<text class="step" x="34" y="87">The target — four nested checks, one missing guard</text>
+<text class="mono" x="34" y="110">if data[0]=='F'</text>
+<text class="mono" x="150" y="110">&amp;&amp; data[1]=='U'</text>
+<text class="mono" x="286" y="110">&amp;&amp; data[2]=='Z'</text>
+<text class="monoo" x="422" y="110">&amp;&amp; data[3]=='Z'</text>
+<text class="monod" x="34" y="130">size&gt;0        size&gt;1            size&gt;2            (no size&gt;3 check!)</text>
+<text class="noteo" x="34" y="154">When the input is exactly the 3 bytes "FUZ", reading <tspan class="monoo" style="font-size:11px">data[3]</tspan> runs one byte past the buffer.</text>
+<text class="note" x="34" y="172">A <tspan class="noteb">static analyzer reads this and stays silent</tspan> — the path looks normal; it can't know the input will ever be "FUZ".</text>
+
+<!-- coverage climb -->
+<rect class="row" x="20" y="198" width="720" height="96" rx="8"/>
+<text class="step" x="34" y="219">How the fuzzer gets there — coverage rewards each new branch (not blind luck)</text>
+<rect class="chip" x="34"  y="232" width="92" height="26" rx="6"/><text class="chipt" x="44" y="249">random…</text>
+<path class="arr" d="M130,245 L152,245" marker-end="url(#a)"/>
+<rect class="chip" x="156" y="232" width="70" height="26" rx="6"/><text class="chipt" x="166" y="249">F…</text>
+<path class="arr" d="M230,245 L252,245" marker-end="url(#a)"/>
+<rect class="chip" x="256" y="232" width="70" height="26" rx="6"/><text class="chipt" x="266" y="249">FU…</text>
+<path class="arr" d="M330,245 L352,245" marker-end="url(#a)"/>
+<rect class="chip" x="356" y="232" width="80" height="26" rx="6"/><text class="chipt" x="366" y="249">FUZ</text>
+<path class="arr" d="M440,245 L462,245" marker-end="url(#a)"/>
+<rect class="chipc" x="466" y="230" width="130" height="30" rx="6"/><text class="chipct" x="476" y="249">data[3] → OOB</text>
+<text class="note" x="34" y="282">Each new byte matched = new code reached = the fuzzer keeps that input and mutates from it. It climbs the gates.</text>
+
+<!-- crash -->
+<rect class="rowf" x="20" y="308" width="720" height="70" rx="8"/>
+<text class="stepb" x="34" y="329">The crash — caught by the sanitizer, at runtime</text>
+<text class="monoo" x="34" y="352">==ERROR== AddressSanitizer: heap-buffer-overflow</text>
+<text class="ok" x="430" y="352">→ + a crash- reproducer file</text>
+<text class="note" x="34" y="370">The read is only a bug <tspan class="noteb">when executed</tspan> with the triggering input — exactly what a fuzzer + ASan produce.</text>
+
+<!-- conclusion -->
+<text class="ttl" x="20" y="414" style="font-size:13px">Why it works</text>
+<text class="note" x="20" y="436">Static tools read the code and miss input-dependent memory bugs. A coverage-guided fuzzer <tspan class="noteb">runs</tspan> the code on</text>
+<text class="note" x="20" y="453">mutated inputs and a sanitizer catches the fault — so SAST and fuzzing are <tspan class="noteo">complements, not substitutes</tspan>.</text>
+</svg>

@@ -52,3 +52,6 @@ crash-*
 
 # /codex skill session-continuity state (Codex thread ID for resume)
 .context/
+
+# Student submission uploads — never belongs in a public repo (PDPA)
+labs/live-quiz/uploads/

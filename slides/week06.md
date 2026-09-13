@@ -71,6 +71,34 @@ jwt-forge
 
 ---
 
+## The fix: verify the signature — one check, every endpoint
+
+```python
+# vulnerable: 'none' allowed + weak secret -> any forged token passes
+if alg == "none": jwt.decode(token, options={"verify_signature": False})
+SECRET = "secret"
+
+# fixed: pin the algorithm, strong secret, require exp + aud
+jwt.decode(token, SECRET, algorithms=["HS256"],
+           audience=AUD, options={"require": ["exp", "aud"]})
+```
+
+- base64url is **encoding, not a seal** — only the signature check stops forgery
+- Pin `algorithms=["HS256"]` (never `"none"`) + a strong random secret from env
+- Fix it in **one place** (`current_user`) → every endpoint is covered at once
+
+<!-- Parallel to Wk4's parameterize slide. The break was never that the payload is readable (base64url always is) — it's that the server trusted a token whose signature it didn't properly check. alg:none says 'no signature' and a vulnerable server obeys; a weak secret ('secret') lets anyone RE-sign. Both defeat the ONE thing that matters: does the signature verify under a key only we hold? Fix: pin HS256 so 'none' is rejected, use a strong random secret from the environment, and require exp+aud so a stray token can't be replayed. Punch line, and the analog of 'parameterize once': this fix lives in current_user(), so the moment you fix it, /api/orders AND /api/admin are both protected — there is no per-endpoint patch to forget. Never put secrets in the payload. ~6 min. -->
+
+---
+
+## JWT forgery in one picture
+
+![A JWT is header.payload.signature in base64url: the header and payload are readable and editable by anyone, only the signature is a seal. Two forgeries: alg:none sets an empty signature and a vulnerable server skips the check and accepts sub:admin; a weak secret lets the attacker re-sign sub:admin so the signature verifies. The fix pins algorithms to HS256, uses a strong secret, and requires exp and aud, so both forged tokens return 401 — and because the check lives in current_user it covers every endpoint at once.](img/jwt-signed-not-sealed.svg)
+
+<!-- Consolidation slide — leave it up during the JWT Forgery lab. It shows the whole story: the payload is always readable (blue), so the bug is never 'they saw the data' — it's a signature that wasn't verified. Point at the orange empty signature (alg:none) and the orange HMAC(secret) (weak key), then the blue fix line: pin HS256, strong secret, require exp+aud. Same story the jwt-forge sim animates live. Land the punch line: signed, not sealed. ~3 min. -->
+
+---
+
 ## OAuth2 / OIDC (high level)
 
 - Delegated access via tokens — don't share passwords
@@ -92,6 +120,26 @@ GET /api/orders/2   → someone else's  😱
 - Vertical (become admin) vs horizontal (other users)
 
 <!-- The worked example — this is the IDOR Treasure Hunt. The server authenticated you but never checked the object BELONGS to you. Horizontal = peer data; vertical = privilege escalation. ~6 min. -->
+
+---
+
+## The fix: check ownership — a valid token is not permission
+
+```python
+# vulnerable: authenticated, but the result is thrown away -> no Gate 2
+def get_order(oid):
+    current_user()                 # WHO you are...
+    return jsonify(ORDERS[oid])    # ...but never 'may you see THIS?'
+
+# fixed: deny-by-default ownership check on every object access
+    if order["owner"] != user: return 403
+```
+
+- Authentication answers **who**; authorization answers **may you touch THIS object**
+- alice's real, valid token must **still** be refused bob's order
+- Check ownership at **every** object access — deny by default
+
+<!-- The IDOR fix mechanism. The vulnerable get_order literally CALLS current_user() and throws the answer away (vulnerable_app.py L63) — Gate 1 runs, Gate 2 doesn't exist. Drive it home: this is not an authentication bug, alice really is alice; it's that being authenticated was treated as permission to read ANY object. The one-line fix compares the object's owner to the caller and denies by default. Emphasize 'every object access' and 'centralize' so one forgotten endpoint doesn't reopen it — which is exactly what the next slide (two gates) generalizes. ~5 min. -->
 
 ---
 
@@ -207,7 +255,7 @@ GET /uploads/backdoor.php?cmd=ls%20-l                200   ← RCE
 3. Switch to `solution_app.py`; re-test: access denied
 4. Cite the exact line that fixes each of the three attacks
 
-<!-- Logistics. Steps 3-4 (verify the defense + cite the fix) graded — no student-authored fix code in this lab, the fix is handed to them already written. Q6 of the quiz asks for the object id they used + the fix + their personal flag. Also the NoteVault project access-control task. -->
+<!-- Logistics. Steps 3-4 (verify the defense + cite the fix) graded — no student-authored fix code in this lab, the fix is handed to them already written. The weekly quiz no longer asks for the object id/fix/flag (dropped — quiz runs before the lab) — that's required in the worksheet instead. Also the NoteVault project access-control task. -->
 
 ---
 

@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 566" role="img" aria-label="How a JSON Web Token is forged and how the server-side fix stops it, for the Week 6 lab. Part one, anatomy: a JWT has three dot-separated base64url parts — a header such as alg HS256, a payload such as sub alice, and a signature which is HMAC of the header and payload using a secret key. The header and payload are only base64url encoded, so anyone can read and edit them; the signature is the only part that proves the token was not tampered with. Part two, two forgeries. Forgery A, alg none: the attacker sets the header to alg none, the payload to sub admin, and leaves the signature empty; a vulnerable server that accepts the none algorithm skips signature verification and accepts the token as admin. Forgery B, weak secret: because the secret is the guessable string secret, the attacker re-signs a payload of sub admin with a valid HMAC, and the server verifies it successfully and accepts it. Both are CWE-347 improper signature verification and CWE-321 weak hardcoded key. Part three, the fix, in current_user: call jwt.decode with a strong random secret, pin algorithms to HS256 only, and require exp and aud. Now the alg none token is rejected because none is not in the allowed list, and the weak-secret token is rejected because its signature fails under the strong key — both return 401. Because this single check lives in current_user, fixing it once protects every endpoint at the same time. Bottom line: a JWT is signed, not sealed; the payload is always readable, so security depends entirely on verifying the signature with a pinned algorithm and a strong secret.">
+<title>A JWT is signed, not sealed — how alg:none and a weak secret forge a token, and the one fix that stops both (Week 6, CWE-347 / CWE-321)</title>
+<style>
+  text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .bg    { fill:#ffffff; }
+  .ttl   { fill:#111827; font-size:16px; font-weight:700; }
+  .sub   { fill:#6b7280; font-size:11.5px; }
+  .step  { fill:#E35205; font-size:12px; font-weight:700; }
+  .stepb { fill:#017BC4; font-size:12px; font-weight:700; }
+  .note  { fill:#6b7280; font-size:11px; }
+  .noteo { fill:#E35205; font-size:11px; font-weight:600; }
+  .noteb { fill:#017BC4; font-size:11px; font-weight:600; }
+  .row   { fill:#fafafa; stroke:#e5e7eb; stroke-width:1; }
+  .rowf  { fill:#f1f8fd; stroke:#017BC4; stroke-width:1.4; }
+  .seg   { stroke-width:1.4; }
+  .segh  { fill:#f3f4f6; stroke:#9ca3af; }   /* header = structure */
+  .segp  { fill:#f1f8fd; stroke:#017BC4; }   /* payload = data (blue) */
+  .segs  { fill:#f1f8fd; stroke:#017BC4; }   /* signature = the seal (blue) */
+  .sego  { fill:#fff1ea; stroke:#E35205; }   /* forged part (orange) */
+  .lbl   { fill:#6b7280; font-size:9.5px; font-weight:700; letter-spacing:.4px; }
+  .code  { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; fill:#111827; }
+  .codeb { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; fill:#017BC4; font-weight:700; }
+  .codeo { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; fill:#E35205; font-weight:700; }
+  .dot   { fill:#9ca3af; font-family:ui-monospace,monospace; font-size:16px; font-weight:700; }
+  .ok    { fill:#017BC4; font-size:11px; font-weight:700; }
+  .bad   { fill:#E35205; font-size:11px; font-weight:700; }
+  .ao    { stroke:#E35205; fill:none; stroke-width:1.8; }
+  .ab    { stroke:#017BC4; fill:none; stroke-width:1.8; }
+  .mko   { fill:#E35205; } .mkb { fill:#017BC4; }
+  @media (prefers-color-scheme: dark) {
+    .bg{fill:#11151a;} .ttl{fill:#e9edf2;} .sub{fill:#9aa3ad;} .note{fill:#9aa3ad;}
+    .step{fill:#ff7a3d;} .stepb{fill:#4aa3dd;} .noteo{fill:#ff7a3d;} .noteb{fill:#4aa3dd;}
+    .row{fill:#171c22;stroke:#2b333c;} .rowf{fill:#122633;stroke:#4aa3dd;}
+    .segh{fill:#1c2129;stroke:#6b7480;} .segp{fill:#122633;stroke:#4aa3dd;} .segs{fill:#122633;stroke:#4aa3dd;}
+    .sego{fill:#2b1a12;stroke:#ff7a3d;} .lbl{fill:#9aa3ad;}
+    .code{fill:#e9edf2;} .codeb{fill:#4aa3dd;} .codeo{fill:#ff7a3d;} .dot{fill:#6b7480;}
+    .ok{fill:#4aa3dd;} .bad{fill:#ff7a3d;} .ao{stroke:#ff7a3d;} .ab{stroke:#4aa3dd;} .mko{fill:#ff7a3d;} .mkb{fill:#4aa3dd;}
+  }
+</style>
+<defs>
+  <marker id="ao" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" refX="9.5" refY="5" orient="auto"><path class="mko" d="M0,0.6 L9.5,5 L0,9.4 Z"/></marker>
+  <marker id="ab" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" refX="9.5" refY="5" orient="auto"><path class="mkb" d="M0,0.6 L9.5,5 L0,9.4 Z"/></marker>
+</defs>
+
+<rect class="bg" x="0" y="0" width="760" height="566"/>
+<text class="ttl" x="20" y="30">A JWT is signed, not sealed</text>
+<text class="sub" x="20" y="49">Week 6 · JWT · CWE-347 (alg:none) · CWE-321 (weak secret) · the token in vulnerable_app.py</text>
+
+<!-- PART 1 — anatomy -->
+<rect class="row" x="20" y="66" width="720" height="92" rx="8"/>
+<text class="step" x="34" y="87" style="fill:#017bc4">① Anatomy — three base64url parts</text>
+<rect class="seg segh" x="34"  y="98" width="150" height="38" rx="6"/>
+<text class="lbl"  x="42" y="112">HEADER</text>
+<text class="code" x="42" y="128">{"alg":"HS256"}</text>
+<text class="dot"  x="190" y="124">.</text>
+<rect class="seg segp" x="204" y="98" width="150" height="38" rx="6"/>
+<text class="lbl"  x="212" y="112">PAYLOAD</text>
+<text class="code" x="212" y="128">{"sub":"alice"}</text>
+<text class="dot"  x="360" y="124">.</text>
+<rect class="seg segs" x="374" y="98" width="266" height="38" rx="6"/>
+<text class="lbl"  x="382" y="112">SIGNATURE — the only seal</text>
+<text class="codeb" x="382" y="128">HMAC(header.payload, secret)</text>
+<text class="note" x="34" y="152">Header &amp; payload are <tspan class="noteb">just base64url — anyone can read AND edit them</tspan>. Only the signature proves nothing was changed.</text>
+
+<!-- PART 2 — forgeries -->
+<rect class="row" x="20" y="170" width="720" height="150" rx="8"/>
+<text class="step" x="34" y="191">② Two ways to forge it</text>
+
+<text class="noteo" x="34" y="213">A · alg:none — claim there is no signature to check</text>
+<rect class="seg sego" x="34"  y="221" width="132" height="30" rx="6"/>
+<text class="codeo" x="42" y="240">{"alg":"none"}</text>
+<text class="dot" x="172" y="243">.</text>
+<rect class="seg sego" x="186" y="221" width="140" height="30" rx="6"/>
+<text class="codeo" x="194" y="240">{"sub":"admin"}</text>
+<text class="dot" x="332" y="243">.</text>
+<rect class="seg sego" x="346" y="221" width="96" height="30" rx="6"/>
+<text class="codeo" x="354" y="240">‹empty›</text>
+<path class="ao" d="M448,236 L470,236" marker-end="url(#ao)"/>
+<text class="bad" x="478" y="240">vuln server skips verify → ACCEPTED as admin</text>
+
+<text class="noteo" x="34" y="277">B · weak secret — the key is the guessable string "secret"</text>
+<rect class="seg sego" x="34" y="285" width="140" height="30" rx="6"/>
+<text class="codeo" x="42" y="304">{"sub":"admin"}</text>
+<text class="code" x="184" y="304">signed with <tspan class="codeo">HMAC(…,"secret")</tspan></text>
+<path class="ao" d="M448,300 L470,300" marker-end="url(#ao)"/>
+<text class="bad" x="478" y="304">secret guessed → valid signature → ACCEPTED</text>
+
+<!-- PART 3 — fix -->
+<rect class="rowf" x="20" y="332" width="720" height="118" rx="8"/>
+<text class="stepb" x="34" y="353">③ The fix — verify properly, in one place (current_user)</text>
+<text class="code" x="34" y="380"><tspan class="codeb">jwt.decode</tspan>(token, <tspan class="codeb">STRONG_SECRET</tspan>, algorithms=<tspan class="codeb">["HS256"]</tspan>, require=<tspan class="codeb">exp, aud</tspan>)</text>
+<path class="ab" d="M46,392 L46,406" marker-end="url(#ab)"/>
+<text class="ok" x="60" y="404">alg:none  → "none" not in ["HS256"]  → 401 rejected</text>
+<path class="ab" d="M46,410 L46,424" marker-end="url(#ab)"/>
+<text class="ok" x="60" y="422">weak-secret token → signature fails under the strong key → 401</text>
+<text class="noteb" x="34" y="442">One check in <tspan class="codeb" style="font-size:11px">current_user()</tspan> → every endpoint (/orders, /admin) is covered at once.</text>
+
+<!-- conclusion -->
+<text class="ttl" x="20" y="486" style="font-size:13px">Why it works</text>
+<text class="note" x="20" y="508">The payload is <tspan class="noteo">always readable</tspan> — that was never the bug. Security rests entirely on <tspan class="noteb">verifying the</tspan></text>
+<text class="note" x="20" y="525"><tspan class="noteb">signature</tspan> with a pinned algorithm and a strong secret. Reject "none", never hardcode the key.</text>
+<text class="sub" x="20" y="549" style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace">fix: solution_app.py L50 (pin alg + require exp/aud) · L10 (strong secret)</text>
+</svg>

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 540" role="img" aria-label="How a single quote character breaks out of a string and turns data into SQL code, in the Week 4 login query, and how a parameterised query stops it. Row one, normal input: the query is SELECT star FROM users WHERE username equals quote alice quote AND password equals quote alicepw quote. The two quoted spans, quote alice quote and quote alicepw quote, are string values shown in blue; the keywords SELECT, FROM, WHERE and AND are structure. The input sits inside the string, so it is just data. Row two, injected input where the username field is alice quote double-dash: the query becomes SELECT star FROM users WHERE username equals quote alice quote double-dash quote AND password equals quote x quote. The user's own quote closes the string early, shown in orange, and the double-dash starts a SQL comment, also orange, so everything after it — the AND password check — is commented out and never runs, shown struck through and greyed. The single quote the attacker typed is the pivot: it flipped from data into code. Result: the query is now just WHERE username equals quote alice quote, so it logs in as alice with no password. Row three, the fix, a parameterised query: SELECT star FROM users WHERE username equals question-mark placeholder, with the value alice quote double-dash bound separately into the placeholder. The database parses and locks the query structure before the input arrives, so the bound value is treated purely as data and can never become grammar; the quote and double-dash are inert, no row matches, and login fails. Bottom line: string concatenation lets the input choose the grammar, while parameterisation locks the grammar first and then binds the value, which is why it is the real fix for SQL injection, not escaping quotes.">
+<title>The quote breaks out — how one character turns data into SQL code, and how a parameterised query stops it (Week 4, CWE-89)</title>
+<style>
+  text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .bg    { fill:#ffffff; }
+  .ttl   { fill:#111827; font-size:16px; font-weight:700; }
+  .sub   { fill:#6b7280; font-size:11.5px; }
+  .step  { fill:#E35205; font-size:12px; font-weight:700; }
+  .stepb { fill:#017BC4; font-size:12px; font-weight:700; }
+  .note  { fill:#6b7280; font-size:11px; }
+  .noteo { fill:#E35205; font-size:11px; font-weight:600; }
+  .noteb { fill:#017BC4; font-size:11px; font-weight:600; }
+  .row   { fill:#fafafa; stroke:#e5e7eb; stroke-width:1; }
+  .rowf  { fill:#f1f8fd; stroke:#017BC4; stroke-width:1.4; }
+  /* code token colours */
+  .code  { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13px; }
+  .kw    { fill:#6b7280; }               /* SQL keywords = structure */
+  .str   { fill:#017BC4; font-weight:700; } /* string value = data (blue) */
+  .inj   { fill:#E35205; font-weight:700; } /* attacker chars that became code */
+  .dead  { fill:#9ca3af; text-decoration:line-through; } /* commented-out, never runs */
+  .slot  { fill:#017BC4; font-weight:700; } /* the ? placeholder */
+  .chip  { fill:#f1f8fd; stroke:#017BC4; stroke-width:1.3; }
+  .chipt { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; fill:#111827; }
+  .ok    { fill:#017BC4; font-size:11px; font-weight:700; }
+  .bad   { fill:#E35205; font-size:11px; font-weight:700; }
+  .ab    { stroke:#017BC4; fill:none; stroke-width:1.8; }
+  .mkb   { fill:#017BC4; }
+  .caret { fill:#E35205; }
+  @media (prefers-color-scheme: dark) {
+    .bg   { fill:#11151a; }
+    .ttl  { fill:#e9edf2; }
+    .sub  { fill:#9aa3ad; }
+    .note { fill:#9aa3ad; }
+    .step { fill:#ff7a3d; } .stepb { fill:#4aa3dd; }
+    .noteo{ fill:#ff7a3d; } .noteb { fill:#4aa3dd; }
+    .row  { fill:#171c22; stroke:#2b333c; }
+    .rowf { fill:#122633; stroke:#4aa3dd; }
+    .kw   { fill:#9aa3ad; }
+    .str  { fill:#4aa3dd; }
+    .inj  { fill:#ff7a3d; }
+    .dead { fill:#5b636c; }
+    .slot { fill:#4aa3dd; }
+    .chip { fill:#122633; stroke:#4aa3dd; }
+    .chipt{ fill:#e9edf2; }
+    .ok   { fill:#4aa3dd; } .bad { fill:#ff7a3d; }
+    .ab   { stroke:#4aa3dd; } .mkb { fill:#4aa3dd; }
+    .caret{ fill:#ff7a3d; }
+  }
+</style>
+<defs>
+  <marker id="hb" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" refX="9.5" refY="5" orient="auto">
+    <path class="mkb" d="M0,0.6 L9.5,5 L0,9.4 Z"/>
+  </marker>
+</defs>
+
+<rect class="bg" x="0" y="0" width="760" height="540"/>
+<text class="ttl" x="20" y="30">The quote breaks out — one character turns data into code</text>
+<text class="sub" x="20" y="49">Week 4 · SQL injection · CWE-89 · the login query in vulnerable_app.py</text>
+
+<!-- ROW 1 — normal input -->
+<rect class="row" x="20" y="66" width="720" height="72" rx="8"/>
+<text class="step" x="34" y="88">① Normal input <tspan class="note">— user = </tspan><tspan class="inj" style="fill:#017bc4">alice</tspan></text>
+<text class="code" x="34" y="114"><tspan class="kw">SELECT * FROM users WHERE username = </tspan><tspan class="str">'alice'</tspan><tspan class="kw"> AND password = </tspan><tspan class="str">'alicepw'</tspan></text>
+<text class="note" x="34" y="131">The input stays <tspan class="noteb">inside the string</tspan> — the database reads it as a value. Nothing breaks.</text>
+
+<!-- ROW 2 — injected -->
+<rect class="row" x="20" y="150" width="720" height="104" rx="8"/>
+<text class="step" x="34" y="172">② Injected input <tspan class="note">— user = </tspan><tspan class="inj">alice'--</tspan></text>
+<text class="code" x="34" y="200"><tspan class="kw">SELECT * FROM users WHERE username = </tspan><tspan class="str">'alice</tspan><tspan class="inj">'--</tspan><tspan class="dead">' AND password = 'x'</tspan></text>
+<!-- caret pointing at the pivot quote -->
+<path class="caret" d="M292,206 l5,9 l5,-9 z"/>
+<text class="noteo" x="34" y="230">Your <tspan class="inj">'</tspan> closes the string early; <tspan class="inj">--</tspan> comments out the rest — the password check <tspan class="dead" style="fill:#9ca3af">never runs</tspan>.</text>
+<text class="bad" x="34" y="247">→ becomes  WHERE username = 'alice'  → logs in as alice, no password needed</text>
+
+<!-- ROW 3 — parameterized fix -->
+<rect class="rowf" x="20" y="266" width="720" height="118" rx="8"/>
+<text class="stepb" x="34" y="288">③ The fix — parameterised query</text>
+<text class="code" x="34" y="316"><tspan class="kw">SELECT * FROM users WHERE username = </tspan><tspan class="slot">?</tspan><tspan class="kw"> AND password = </tspan><tspan class="slot">?</tspan></text>
+<text class="note" x="34" y="335">structure parsed &amp; <tspan class="noteb">locked before any input arrives</tspan> — the <tspan class="slot">?</tspan> are the only value slots</text>
+<!-- bound value chip -->
+<rect class="chip" x="34" y="346" width="150" height="24" rx="6"/>
+<text class="chipt" x="44" y="362">alice'--</text>
+<path class="ab" d="M188,358 L214,358" marker-end="url(#hb)"/>
+<text class="noteb" x="222" y="356">bound as a <tspan class="slot">value</tspan>, not syntax</text>
+<text class="ok" x="222" y="372">→ the ' and -- are inert · no row matches · login fails</text>
+
+<!-- CONCLUSION -->
+<text class="ttl" x="20" y="414" style="font-size:13px">Why it works</text>
+<text class="note" x="20" y="436">Concatenation hands the database <tspan class="noteo">one finished string</tspan> and lets it decide the grammar afterwards —</text>
+<text class="note" x="20" y="453">so the input can inject grammar. Parameterisation <tspan class="noteb">locks the grammar first</tspan>, then binds the value.</text>
+<text class="note" x="20" y="470">That is the fix for SQLi — <tspan class="noteo">not</tspan> escaping quotes, which only tries to spot bad characters.</text>
+<text class="sub" x="20" y="494" style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace">fix: solution_app.py L52-55 (login) · L62-66 (search)</text>
+</svg>

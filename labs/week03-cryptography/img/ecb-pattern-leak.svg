@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 486" role="img" aria-label="Why ECB mode leaks patterns, and how AES-GCM fixes it, using the Week 3 lab example. The plaintext is two identical sixteen-byte blocks, both the letter A repeated sixteen times. Under ECB mode each block is encrypted independently with the same key, so the two identical plaintext blocks produce two identical ciphertext blocks — the same hex bytes repeat, so the repetition in the data is still visible in the ciphertext. This is the classic ECB-penguin effect: the shape survives encryption. Encrypting the exact same two-block input again gives the exact same ciphertext, because there is no nonce. Under AES-GCM the same plaintext produces two different, random-looking ciphertext blocks, plus a random nonce and an authentication tag, so no pattern is visible and any tampering is detected. Bottom line: ECB encrypts each block independently, so identical plaintext yields identical ciphertext and patterns leak; AES-GCM with a random nonce gives confidentiality and integrity together. Choosing AES is not enough — AES in ECB mode, or AES-GCM under a hardcoded key, is still broken.">
+<title>Why ECB leaks — identical plaintext blocks become identical ciphertext blocks, and how AES-GCM fixes it (Week 3, CWE-327)</title>
+<style>
+  text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .bg{fill:#ffffff;} .ttl{fill:#111827;font-size:16px;font-weight:700;} .sub{fill:#6b7280;font-size:11.5px;}
+  .step{fill:#E35205;font-size:12px;font-weight:700;} .stepb{fill:#017BC4;font-size:12px;font-weight:700;}
+  .note{fill:#6b7280;font-size:11px;} .noteo{fill:#E35205;font-size:11px;font-weight:600;} .noteb{fill:#017BC4;font-size:11px;font-weight:600;}
+  .row{fill:#fafafa;stroke:#e5e7eb;stroke-width:1;} .rowf{fill:#f1f8fd;stroke:#017BC4;stroke-width:1.4;}
+  .pt{fill:#f1f8fd;stroke:#017BC4;stroke-width:1.4;}      /* plaintext block (blue) */
+  .ctbad{fill:#fff1ea;stroke:#E35205;stroke-width:1.4;}   /* identical cipher (orange) */
+  .ct1{fill:#e8f0f8;stroke:#017BC4;stroke-width:1.4;}
+  .ct2{fill:#dce8f4;stroke:#017BC4;stroke-width:1.4;}
+  .lbl{fill:#6b7280;font-size:9.5px;font-weight:700;letter-spacing:.3px;}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;fill:#111827;}
+  .monob{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;fill:#017BC4;font-weight:700;}
+  .monoo{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;fill:#E35205;font-weight:700;}
+  .bad{fill:#E35205;font-size:11px;font-weight:700;} .ok{fill:#017BC4;font-size:11px;font-weight:700;}
+  .arr{stroke:#6b7280;fill:none;stroke-width:1.8;} .mk{fill:#6b7280;}
+  .eq{fill:#E35205;font-size:15px;font-weight:700;} .ne{fill:#017BC4;font-size:15px;font-weight:700;}
+  @media (prefers-color-scheme: dark) {
+    .bg{fill:#11151a;} .ttl{fill:#e9edf2;} .sub{fill:#9aa3ad;} .note{fill:#9aa3ad;}
+    .step{fill:#ff7a3d;} .stepb{fill:#4aa3dd;} .noteo{fill:#ff7a3d;} .noteb{fill:#4aa3dd;}
+    .row{fill:#171c22;stroke:#2b333c;} .rowf{fill:#122633;stroke:#4aa3dd;}
+    .pt{fill:#122633;stroke:#4aa3dd;} .ctbad{fill:#2b1a12;stroke:#ff7a3d;}
+    .ct1{fill:#16222e;stroke:#4aa3dd;} .ct2{fill:#1b2a38;stroke:#4aa3dd;} .lbl{fill:#9aa3ad;}
+    .mono{fill:#e9edf2;} .monob{fill:#4aa3dd;} .monoo{fill:#ff7a3d;}
+    .bad{fill:#ff7a3d;} .ok{fill:#4aa3dd;} .arr{stroke:#9aa3ad;} .mk{fill:#9aa3ad;}
+    .eq{fill:#ff7a3d;} .ne{fill:#4aa3dd;}
+  }
+</style>
+<defs>
+  <marker id="a" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" refX="9.5" refY="5" orient="auto"><path class="mk" d="M0,0.6 L9.5,5 L0,9.4 Z"/></marker>
+</defs>
+<rect class="bg" x="0" y="0" width="760" height="486"/>
+<text class="ttl" x="20" y="30">Why ECB leaks — identical blocks become identical ciphertext</text>
+<text class="sub" x="20" y="49">Week 3 · AES misuse · CWE-327 · encrypt_ecb(b"A"*16 + b"A"*16) in vulnerable_crypto.py</text>
+
+<!-- plaintext -->
+<text class="lbl" x="20" y="76">PLAINTEXT — two identical 16-byte blocks</text>
+<rect class="pt" x="20"  y="84" width="150" height="38" rx="6"/>
+<text class="mono" x="30" y="108">AAAAAAAAAAAAAAAA</text>
+<rect class="pt" x="180" y="84" width="150" height="38" rx="6"/>
+<text class="mono" x="190" y="108">AAAAAAAAAAAAAAAA</text>
+<text class="noteb" x="338" y="107">same 16 bytes, twice</text>
+
+<!-- ECB row -->
+<rect class="row" x="20" y="140" width="720" height="118" rx="8"/>
+<text class="step" x="34" y="162">ECB — each block encrypted independently, same key, no nonce</text>
+<rect class="ctbad" x="34"  y="176" width="180" height="40" rx="6"/>
+<text class="monoo" x="44" y="201">e3 2b 91 ...  a7</text>
+<text class="eq" x="222" y="201">=</text>
+<rect class="ctbad" x="244" y="176" width="180" height="40" rx="6"/>
+<text class="monoo" x="254" y="201">e3 2b 91 ...  a7</text>
+<text class="bad" x="440" y="193">identical ciphertext blocks</text>
+<text class="note" x="440" y="209">→ the repeat is still visible (the "ECB penguin")</text>
+<text class="noteo" x="34" y="238">Encrypt the same input again → the exact same bytes. Patterns — and equality — leak straight through.</text>
+
+<!-- GCM row -->
+<rect class="rowf" x="20" y="272" width="720" height="118" rx="8"/>
+<text class="stepb" x="34" y="294">AES-GCM — random nonce + authentication tag</text>
+<rect class="ct1" x="34"  y="308" width="180" height="40" rx="6"/>
+<text class="monob" x="44" y="333">7f a0 14 ...  9c</text>
+<text class="ne" x="222" y="333">≠</text>
+<rect class="ct2" x="244" y="308" width="180" height="40" rx="6"/>
+<text class="monob" x="254" y="333">b2 6e c5 ...  31</text>
+<text class="ok" x="440" y="325">different every block &amp; every run</text>
+<text class="note" x="440" y="341">→ no visible pattern · tampering is detected</text>
+<text class="noteb" x="34" y="370">nonce (os.urandom) makes each encryption unique; the tag proves the ciphertext wasn't altered.</text>
+
+<!-- conclusion -->
+<text class="ttl" x="20" y="418" style="font-size:13px">Why it works</text>
+<text class="note" x="20" y="440">ECB reuses no state between blocks, so equal plaintext → equal ciphertext. AES-GCM adds a random nonce</text>
+<text class="note" x="20" y="457">(confidentiality) and an auth tag (integrity). <tspan class="noteo">Choosing AES is not the fix</tspan> — AES-ECB leaks, and AES-GCM under a</text>
+<text class="note" x="20" y="474">hardcoded key is still CWE-798. <tspan class="noteb">fix: solution_skeleton.py encrypt_gcm() — GCM + random nonce + key from env.</tspan></text>
+</svg>

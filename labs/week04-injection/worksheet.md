@@ -2,7 +2,7 @@
 
 > **Course:** Software Security (KOSEN69) · **Week 4**
 > **Aligned:** OWASP 2025 **A05 Injection** · **CWE-89** (SQLi), **CWE-78** (OS command injection), **CWE-434** (unrestricted upload)
-> **Signature game:** 🐉 **SQLi Boss Fight** — each successful injection lands a "hit" on the boss; the boss falls when you dump every credential and land an RCE.
+> **Signature game:** 🐉 **SQLi Warm-up** — each successful injection lands a "hit"; you clear it when you dump every credential and land an RCE.
 
 > ⚠️ **Ethics note:** All payloads here are for the provided sandbox (`vulnerable_app.py`) and your own DVWA/Juice Shop containers **only**. Never test systems you do not own or have written permission to test. Unauthorized injection is a crime under most computer-misuse laws.
 
@@ -64,6 +64,7 @@ sqli-parse
 **Task 1 — Auth bypass via SQLi (25 min) 🐉 Hit #1.**
 - *Goal:* log in as `alice` with **no valid password**.
 - *Steps:* hit `/login?user=alice'--&pw=x`, then `/login?user=x' OR '1'='1'--&pw=x` (the trailing `--` is required: without it, SQL binds `AND` tighter than `OR`, so `... OR '1'='1' AND password='x'` matches no row). Observe the comment in the query at lines 61–63 of `vulnerable_app.py`.
+- *Note — browser vs `curl`:* pasted into a **browser**, the space in `x' OR '1'='1'--` is encoded for you; with **`curl`** an unencoded space silently returns a **blank page (no error)**. Use `curl -G "http://localhost:8080/login" --data-urlencode "user=x' OR '1'='1'--" --data-urlencode "pw=x"` — same `-G --data-urlencode` form for Task 2's `q=`.
 - *Deliverable:* both URLs + screenshot of `Welcome alice` + explain why `--` and `OR '1'='1` work.
  answer:http://localhost:8080/login?user=alice'--&pw=x ![alt text](image-1.png),http://localhost:8080/login?user=x%27%20OR%20%271%27=%271%27--&pw=x ![alt text](image-2.png)
  Because The OR '1'='1' condition is always true, so the login query can match a user without knowing the correct password. The -- starts a SQL comment, so the remaining password condition is ignored. This allows the attacker to bypass the authentication check.
@@ -80,14 +81,20 @@ Answer: ![alt text](image-3.png) The number of columns in the UNION SELECT must 
 - *Steps:* request `/ping?host=127.0.0.1;id` then `/ping?host=$(whoami)` (URL-encode if needed). Capture the injected command's output.
 - *Deliverable:* both payloads + screenshot of `id`/`whoami` output + explanation of the `shell=True` flaw (CWE-78).
 Answer: payload1 127.0.0.1;id ![alt text](image-4.png) , payload2 127.0.0.1;whoami ![alt text](image-5.png)
+- *Goal:* run an arbitrary command through `/ping`, then read this lab's command-injection flag with it.
+- *Steps:* request `/ping?host=127.0.0.1;id` then `/ping?host=127.0.0.1;whoami` (URL-encode if needed). Capture the injected command's output. Then use the same injection to read the flag file the server keeps at `/flag.txt` (the space needs `--data-urlencode`, see the note on Task 1):
+  ```bash
+  curl -G "http://localhost:8080/ping" --data-urlencode "host=127.0.0.1;cat /flag.txt"
+  ```
+- *Deliverable:* the three payloads + screenshot of the `id`/`whoami` output **and** the `FLAG{...}` from `/flag.txt` + explanation of the `shell=True` flaw (CWE-78).
 
 **Task 4 — Unrestricted upload (25 min) 🐉 Hit #4.**
 - *Goal:* show the upload accepts a dangerous file type with no checks (CWE-434).
-- *Steps:* `GET /upload` (form), then upload a file named `shell.py`. Confirm `saved to /tmp/uploads/shell.py`. Discuss: if `UPLOAD_DIR` were web-served or executed, this is the RCE chain (here the dir is **not** served, so document the missing control rather than claiming auto-RCE).
+- *Steps:* `GET /upload` (form), then upload a file named `shell.py`. Confirm `saved to /tmp/uploads/shell.py`. Via the browser form this just works; via `curl` the file field is named **`f`**: `curl -F "f=@shell.py" "http://localhost:8080/upload"`. Discuss: if `UPLOAD_DIR` were web-served or executed, this is the RCE chain (here the dir is **not** served, so document the missing control rather than claiming auto-RCE).
 - *Deliverable:* upload command/screenshot + 2–3 sentences on why extension allow-listing matters.
 Answer: ![alt text](image-6.png) The application accepts a .py file without checking whether the file extension is allowed, which creates an unrestricted file upload vulnerability (CWE-434). An extension allow-list should permit only safe file types that the application actually needs and reject executable or dangerous file types. In this lab, the upload directory is not web-served or executed, so uploading shell.py does not automatically result in RCE.
 
-**Task 5 — Defend / fix it (35 min) 🛡️ Boss defeated.**
+**Task 5 — Defend / fix it (35 min) 🛡️ Warm-up cleared.**
 - *Goal:* prove `solution_app.py` blocks Tasks 1–4.
 - *Steps:* stop the vulnerable container (`Ctrl-C`), then run the fixed app on the same compose env:
   ```bash

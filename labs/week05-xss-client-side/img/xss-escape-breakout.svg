@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 544" role="img" aria-label="How a less-than character breaks out and turns data into a running script in the Week 5 hello page, and how output encoding stops it. Row one, normal input name equals you: the page is h1 Hello, you exclamation close-h1; the word you sits between the tags as text, so the browser renders Hello, you. Row two, injected input name equals script alert 1 close-script: the page becomes h1 Hello, then a real script tag containing alert 1, then close-h1; the user's less-than opens a genuine tag, so the browser parses it as a script element and executes alert 1 in the site's own origin — this is where data became code, the same break-out as a quote in SQL injection. Row three, the fix, escape on output: the value is encoded so less-than becomes ampersand l t semicolon and greater-than becomes ampersand g t semicolon; the browser reads those as HTML entities, which are text and not a tag start, so it displays the literal characters script alert 1 close-script on the page and runs nothing. Bottom line: XSS is a bug on output, not input; encode the data for the context it lands in — HTML body, attribute, JavaScript, or URL each need different encoding — so that a less-than can never start a tag. The script is shown, not run.">
+<title>The &lt; breaks out — how one character turns data into a running script, and how output encoding stops it (Week 5, CWE-79)</title>
+<style>
+  text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .bg   { fill:#ffffff; }
+  .ttl  { fill:#111827; font-size:16px; font-weight:700; }
+  .sub  { fill:#6b7280; font-size:11.5px; }
+  .step { fill:#E35205; font-size:12px; font-weight:700; }
+  .stepb{ fill:#017BC4; font-size:12px; font-weight:700; }
+  .note { fill:#6b7280; font-size:11px; }
+  .noteo{ fill:#E35205; font-size:11px; font-weight:600; }
+  .noteb{ fill:#017BC4; font-size:11px; font-weight:600; }
+  .row  { fill:#fafafa; stroke:#e5e7eb; stroke-width:1; }
+  .rowf { fill:#f1f8fd; stroke:#017BC4; stroke-width:1.4; }
+  .code { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13px; }
+  .kw   { fill:#6b7280; }               /* HTML structure = muted */
+  .str  { fill:#017BC4; font-weight:700; } /* text / data (blue) */
+  .inj  { fill:#E35205; font-weight:700; } /* became a live tag (orange) */
+  .render { fill:#ffffff; stroke:#9ca3af; stroke-width:1.2; }
+  .renderb{ fill:#f1f8fd; stroke:#017BC4; stroke-width:1.2; }
+  .rt   { font-size:12px; fill:#111827; }
+  .rtb  { font-size:12px; fill:#017BC4; font-weight:700; }
+  .runm { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; fill:#111827; }
+  .bad  { fill:#E35205; font-size:11px; font-weight:700; }
+  .ok   { fill:#017BC4; font-size:11px; font-weight:700; }
+  .caret{ fill:#E35205; }
+  @media (prefers-color-scheme: dark) {
+    .bg{fill:#11151a;} .ttl{fill:#e9edf2;} .sub{fill:#9aa3ad;} .note{fill:#9aa3ad;}
+    .step{fill:#ff7a3d;} .stepb{fill:#4aa3dd;} .noteo{fill:#ff7a3d;} .noteb{fill:#4aa3dd;}
+    .row{fill:#171c22;stroke:#2b333c;} .rowf{fill:#122633;stroke:#4aa3dd;}
+    .kw{fill:#9aa3ad;} .str{fill:#4aa3dd;} .inj{fill:#ff7a3d;}
+    .render{fill:#1c2129;stroke:#6b7480;} .renderb{fill:#122633;stroke:#4aa3dd;}
+    .rt{fill:#e9edf2;} .rtb{fill:#4aa3dd;} .runm{fill:#e9edf2;}
+    .bad{fill:#ff7a3d;} .ok{fill:#4aa3dd;} .caret{fill:#ff7a3d;}
+  }
+</style>
+<rect class="bg" x="0" y="0" width="760" height="544"/>
+<text class="ttl" x="20" y="30">The &lt; breaks out — one character turns data into a running script</text>
+<text class="sub" x="20" y="49">Week 5 · Cross-Site Scripting · CWE-79 · the /hello page in vulnerable_app.py</text>
+
+<!-- ROW 1 -->
+<rect class="row" x="20" y="66" width="720" height="74" rx="8"/>
+<text class="step" x="34" y="88" style="fill:#017bc4">① Normal input <tspan class="note">— name = </tspan><tspan class="str">you</tspan></text>
+<text class="code" x="34" y="114"><tspan class="kw">&lt;h1&gt;Hello, </tspan><tspan class="str">you</tspan><tspan class="kw">!&lt;/h1&gt;</tspan></text>
+<rect class="render" x="500" y="98" width="150" height="24" rx="5"/>
+<text class="rt" x="510" y="114">Hello, you</text>
+<text class="note" x="34" y="133">The value sits <tspan class="noteb">between the tags as text</tspan> — the browser just displays it.</text>
+
+<!-- ROW 2 -->
+<rect class="row" x="20" y="152" width="720" height="94" rx="8"/>
+<text class="step" x="34" y="174">② Injected <tspan class="note">— name = </tspan><tspan class="inj">&lt;script&gt;alert(1)&lt;/script&gt;</tspan></text>
+<text class="code" x="34" y="200"><tspan class="kw">&lt;h1&gt;Hello, </tspan><tspan class="inj">&lt;script&gt;alert(1)&lt;/script&gt;</tspan><tspan class="kw">!&lt;/h1&gt;</tspan></text>
+<path class="caret" d="M110,206 l5,9 l5,-9 z"/>
+<text class="noteo" x="34" y="226">Your <tspan class="inj">&lt;</tspan> opens a <tspan class="inj">real tag</tspan> — the browser parses &lt;script&gt; and runs it, in the site's origin.</text>
+<text class="bad" x="34" y="242">→ executes alert(1) · can read document.cookie, rewrite the page, act as the victim</text>
+
+<!-- ROW 3 -->
+<rect class="rowf" x="20" y="258" width="720" height="98" rx="8"/>
+<text class="stepb" x="34" y="280">③ The fix — escape() on output</text>
+<text class="code" x="34" y="306"><tspan class="kw">&lt;h1&gt;Hello, </tspan><tspan class="str">&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;</tspan><tspan class="kw">!&lt;/h1&gt;</tspan></text>
+<rect class="renderb" x="470" y="318" width="270" height="26" rx="5"/>
+<text class="runm" x="480" y="335">Hello, &lt;script&gt;alert(1)&lt;/script&gt;</text>
+<text class="note" x="34" y="335"><tspan class="noteb">&amp;lt;</tspan> is an HTML entity — the parser reads it as <tspan class="noteb">text, not a tag-start</tspan>.</text>
+<text class="ok" x="34" y="351">→ the browser shows the characters; nothing runs · data stays data</text>
+
+<!-- CONCLUSION -->
+<text class="ttl" x="20" y="392" style="font-size:13px">Why it works</text>
+<text class="note" x="20" y="414">XSS is a bug on <tspan class="noteo">output</tspan>, not input — storing &lt;script&gt; is fine; rendering it unescaped is the bug.</text>
+<text class="note" x="20" y="431">Encode the value for <tspan class="noteb">the context it lands in</tspan> — HTML body, attribute, JavaScript, or URL each need</text>
+<text class="note" x="20" y="448">different encoding — so a <tspan class="noteo">&lt;</tspan> can never start a tag. Cookie flags &amp; CSP are extra layers, not the fix.</text>
+<text class="sub" x="20" y="472" style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace">fix: fixed_app.py L21 (escape reflected) · L29-33 (Jinja autoescape, stored) · L12 (CSP, defense-in-depth)</text>
+</svg>

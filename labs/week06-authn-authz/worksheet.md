@@ -108,30 +108,26 @@ Answer:![alt text](image-3.png) The alg:none flaw allows an attacker to create a
   )
   curl -s http://localhost:8080/api/orders/2 -H "Authorization: Bearer $FORGED2"
   ```
+- *Note:* recent PyJWT prints an `InsecureKeyLengthWarning` to **stderr** because `"secret"` is only 6 bytes — that is expected, the token still mints and is accepted.
 - *Deliverable:* token + screenshot + 2–3 sentences on why secret strength + key management matter.
 Answer:![alt text](image-4.png) The hardcoded HMAC secret "secret" is weak and easy to guess, allowing an attacker to create a valid HS256 JWT for Bob without knowing his password. A strong random secret and proper key management make the signing key difficult to guess and prevent attackers from forging valid tokens.
 
-**Task 4 — Privilege/identity escalation reasoning (25 min).**
-- *Goal:* combine the flaws. Using Task 2/3 you became `bob` *without his password*; using Task 1 you read objects you don't own.
-- *Steps:* document the full attack chain (forge token → access any `oid`). Optionally replay the requests through **Burp Suite Repeater** and screenshot the intercepted request/response.
-- *Deliverable:* a short chain diagram/paragraph + Burp (or curl) evidence.
-answer:Attack chain: The attacker first forges a JWT with sub: bob using either the alg:none vulnerability or the weak HMAC secret. This allows the attacker to impersonate Bob without knowing his password. The attacker can then change the oid in /api/orders/<oid> to access orders that belong to other users because the application does not perform an ownership check.
-Weak JWT validation
-       ↓
-Forge Bob's JWT
-       ↓
-Impersonate Bob
-       ↓
-Send Bearer token
-       ↓
-Change oid
-       ↓
-Missing ownership check
-       ↓
-Access unauthorized order
+**Task 4 — Privilege escalation to admin via a forged token (25 min) 🔏.**
+- *Goal:* read the admin-only flag at `/api/admin` — a page **IDOR cannot reach**: there is no object id to walk, and there is no `admin` account you could log in as (`USERS` has only alice and bob). The only way in is to forge your identity.
+- *Steps:* forge a token claiming `sub=admin` (either technique from Task 2/3 works — `alg:none` or the weak `"secret"`), then call `/api/admin`:
+  ```bash
+  FORGED=$(python3 - <<'PY'
+  import jwt
+  print(jwt.encode({"sub": "admin"}, key="", algorithm="none"))
+  PY
+  )
+  curl -s http://localhost:8080/api/admin -H "Authorization: Bearer $FORGED"
+  ```
+  You should get `FLAG{...}`. Then confirm alice's **real** token gets `403 forbidden` on the same endpoint — proof the server's role check (`if user != "admin"`) is fine; the break is purely that authentication accepted a forged identity.
+- *Deliverable:* the forged token + screenshot of the flag + the `403` for alice's real token, and 2–3 sentences: why IDOR can't reach this (horizontal access vs. **vertical** privilege escalation), and why the app's own `if user != "admin"` check didn't save it.
 
 **Task 5 — Defend / fix it (30 min) 🛡️.**
-- *Goal:* prove `solution_app.py` blocks Tasks 1–3.
+- *Goal:* prove `solution_app.py` blocks Tasks 1–4.
 - *Steps:* stop the vulnerable container (`Ctrl-C`), then:
   ```bash
   docker compose run --rm --service-ports authz-lab bash -c "pip install --no-cache-dir flask pyjwt && python solution_app.py"
@@ -139,6 +135,8 @@ Access unauthorized order
   Re-run: get a fresh alice token, then re-fire each attack. Expected: `/api/orders/2` with alice's token → **403 forbidden** (ownership check, L64); the `alg:none` token → **401 invalid token** (algorithm pinned to HS256, L50); the `"secret"` token → **401** (strong random secret + required `aud`/`exp`, L10/40).
 - *Deliverable:* screenshots of the 403 and both 401s + name the fix line for each.
 Answer:![alt text](image-5.png)
+  Re-run: get a fresh alice token, then re-fire each attack. Expected: `/api/orders/2` with alice's token → **403 forbidden** (ownership check, L64); the `alg:none` token → **401 invalid token** (algorithm pinned to HS256, L50); the `"secret"` token → **401** (strong random secret + required `aud`/`exp`, L10/40). For Task 4, `/api/admin` with a forged `sub=admin` token → **401** — the *same* `current_user()` fix (L50) rejects the forgery before the role check runs, so one fix closes every endpoint; alice's real token still gets **403** there (she isn't admin).
+- *Deliverable:* screenshots of the 403 and the 401s (orders **and** `/api/admin`) + name the fix line for each.
 
 ## Part 4 — Reflection
 

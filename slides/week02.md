@@ -101,6 +101,14 @@ mkdir -p corpus && printf 'FUZ' > corpus/seed && ./fuzz corpus
 
 ---
 
+## How fuzzing finds it
+
+![A coverage-guided fuzzer reaches a bug a static analyzer misses: the harness has four nested byte checks (F, U, Z, Z) and the fourth reads data[3] with no size>3 guard, so the input 'FUZ' reads one byte out of bounds. SAST reads the code and stays silent; the fuzzer mutates inputs and is rewarded for each new branch reached, climbing random -> F -> FU -> FUZ until the unguarded read crashes under AddressSanitizer, which writes a reproducer file. SAST and fuzzing are complements, not substitutes.](img/fuzzing-finds-it.svg)
+
+<!-- The static companion to the fuzz-verdict sim, and the answer to 'why fuzz if we already ran SAST?' Walk it: SAST can't know the input will ever be exactly FUZ, so it stays silent (blue); the fuzzer doesn't brute-force randomly — coverage feedback rewards each new gate passed, so it climbs to FUZ and the unguarded data[3] read faults under ASan (orange). Land on: static reads, fuzzing runs — complements. ~4 min. -->
+
+---
+
 ## Try it — what actually crashes this harness
 
 Type bytes, or pick a preset. Each cell is one `if` in the real source.

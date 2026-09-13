@@ -44,7 +44,7 @@ By the end of the course, students will be able to:
 
 MFU delivers this course as 7 full-day weekend sessions rather than 19 weekly meetings. Each session keeps the same **lecture → lab** structure as the KOSEN offering, just compressed: the 08:00–12:00 block covers that session's lecture content for all topics assigned to it, and the 13:00–17:00 block runs the corresponding hands-on labs/games back to back. Total contact hours and technical content are unchanged from the 19-week version — only the calendar grouping differs.
 
-**The opening weekend is a double session, and that has consequences worth naming.** Sessions 1 and 2 fall on consecutive days (Sat 15 + Sun 16 Aug), so the four topics of Weeks 1–4 — threat modeling, secure SDLC/tooling, cryptography and injection — land inside about 36 hours. Two things follow. First, there is no week between them to fix a broken environment, so the "Lab 0" setup below is not a suggestion; a laptop that cannot run Docker on Saturday morning will also not run it on Sunday morning. Second, the gap from Session 2 to Session 3 is three weeks (16 Aug → 5 Sep), the longest in the term — that gap, not the opening weekend, is where the Week 3–4 material should be consolidated through the take-home labs.
+**The opening weekend is a double session, and that has consequences worth naming.** Sessions 1 and 2 fall on consecutive days (Sat 15 + Sun 16 Aug), so the four topics of Weeks 1–4 — threat modeling, secure SDLC/tooling, cryptography and injection — land inside about 36 hours. Two things follow. First, there is no week between them to fix a broken environment, so the "Lab 0" setup below is not a suggestion; a laptop that cannot run Docker on Saturday morning will also not run it on Sunday morning. Second, the gap from Session 2 to Session 3 is three weeks (16 Aug → 5 Sep), the longest in the term — that gap, not the opening weekend, is where the Week 3–4 material should be consolidated through the take-home labs. **As actually delivered, Session 2 ran short and the Week 4 injection block was not taught at all** — it moved to Session 3, which therefore carries three topics (Wk 4–6) rather than two. The schedule below records what happened, not the original plan.
 
 **A pacing note, stated plainly rather than smoothed over:** because the 19-week content splits 6 topics before the midterm and 7 after, but the calendar gives 3 sessions before the midterm and only 2 after, per-topic time is not perfectly even — Sessions 1–3 give each topic roughly 2 lecture hours + 2 lab hours, while Sessions 5–6 compress to roughly 1.3–2 hours each per topic. Session 6's original 4-topic load has been rebalanced below (see §5) by moving the Week 16 capstone-studio content to self-study/pre-final prep rather than new taught content that session — this is a deliberate adaptation, not an oversight, and matches how the source Week 16 was already designed (no vulnerable-target lab, practice-only — `labs/week16-capstone/` holds the scrimmage/worksheet materials but no Docker lab environment).
 
@@ -73,8 +73,8 @@ Bring a laptop able to run Docker Desktop to every session — the compressed fo
 | Session | Date | 19-wk equiv. | AM lecture (08:00–12:00) | PM lab (13:00–17:00) |
 |---|---|---|---|---|
 | 1 | Sat 15 Aug 69 | Wk 1–2 | Threat modeling + Secure SDLC/tooling | STRIDE game + Bug Triage/Fuzzing Race |
-| **2** | **Sun 16 Aug 69** | Wk 3–4 | Cryptography + Injection | Capture the Hash + SQLi Boss Fight |
-| 3 | Sat 5 Sep 69 | Wk 5–6 | XSS/client-side + Authn/access control | XSS Golf + IDOR Treasure Hunt/JWT Forgery |
+| **2** | **Sun 16 Aug 69** | Wk 3 *(Wk 4 deferred)* | Cryptography | Capture the Hash |
+| 3 | Sat 5 Sep 69 | Wk 4–6 | Injection + XSS/client-side + Authn/access control | SQLi Warm-up + XSS Golf + IDOR Treasure Hunt/JWT Forgery |
 | **4** | **Sat 19 Sep 69** | **Wk 8–9** | **Midterm written exam** (covers Sessions 1–3) | **Midterm CTF practical** |
 | 5 | Sat 10 Oct 69 | Wk 10–12 | API security + Memory-safety + Supply chain | crAPI Raid + Pwn the Binary + Dependency Confusion Heist |
 | 6 | Sat 24 Oct 69 | Wk 13–15 | Cloud/container + AI/LLM security + DevSecOps | Misconfig Hunt + Gandalf Challenge + Break the Build |
@@ -92,23 +92,29 @@ Bring a laptop able to run Docker Desktop to every session — the compressed fo
 - 🎲 **"Elevation of Privilege"** — play Microsoft's STRIDE card deck against a provided app's DFD; build a STRIDE threat model + attack-surface map. Lab 0 environment setup confirmed.
 - 🏁 **"Bug Triage Race" + "Fuzzing Race"** — run Semgrep + Gitleaks on a flawed repo and triage by CWE (scored); intro coverage-guided fuzzing (first crash wins).
 
-### Session 2 (Sun 16 Aug 69) — Wk 3–4: Foundations II / Web App Security I
+### Session 2 (Sun 16 Aug 69) — Wk 3: Foundations II
 
-**AM — Cryptography Used Correctly (and Misused) / Injection & Input Handling**
+> **Delivered as Wk 3 only.** The session ran out of time before the Week 4 injection block; it is taught in Session 3 instead.
+
+**AM — Cryptography Used Correctly (and Misused)**
 - Hashing vs. encryption vs. encoding; symmetric/asymmetric basics; password storage (bcrypt/argon2); TLS overview; common failures (ECB, hardcoded keys, weak randomness, MD5/SHA-1). Maps to **A04:2025 Cryptographic Failures**.
-- SQL injection, command injection, the general injection pattern; parameterized queries; output encoding. Maps to **A05:2025 Injection**.
+- *(Injection & Input Handling — moved to Session 3.)*
 
 **PM — Labs**
 - 🔓 **"Capture the Hash"** — crack weak hashes + break an ECB oracle (speedrun), then remediate with a vetted KDF and authenticated encryption.
-- ⚔️ **"SQLi Boss Fight"** — tiered injection challenges in DVWA/Juice Shop; rewrite endpoints with prepared statements + validation.
+- *("SQLi Warm-up" — moved to Session 3.)*
 
-### Session 3 (Sat 5 Sep 69) — Wk 5–6: Web App Security II
+### Session 3 (Sat 5 Sep 69) — Wk 4–6: Web App Security I–II
 
-**AM — Cross-Site Scripting (XSS) & Client-Side Risks / Authentication, Sessions & Access Control**
+> **Three topics, not two** — carries Week 4 forward from Session 2. Injection is taught first: XSS is the same injection pattern moved into the browser, so Wk 4 is the prerequisite for Wk 5, not merely a catch-up.
+
+**AM — Injection & Input Handling / Cross-Site Scripting (XSS) & Client-Side Risks / Authentication, Sessions & Access Control**
+- SQL injection, command injection, the general injection pattern; parameterized queries; output encoding. Maps to **A05:2025 Injection**.
 - Reflected/stored/DOM XSS; CSRF; SameSite cookies; Content Security Policy; same-origin policy.
 - Authn vs. authz; session management; JWT pitfalls; OAuth 2.0/OIDC overview; IDOR and privilege escalation. Maps to **A01:2025 Broken Access Control** and **A07:2025 Authentication Failures**.
 
 **PM — Labs**
+- ⚔️ **"SQLi Warm-up"** — tiered injection challenges in DVWA/Juice Shop; rewrite endpoints with prepared statements + validation.
 - ⛳ **"XSS Golf"** — shortest payload that pops `alert(1)`/steals a cookie wins; then deploy a CSP + escaping that blocks every payload; demo CSRF + defense.
 - 🗺️ **"IDOR Treasure Hunt + JWT Forgery"** — reach other users' data via object-id tampering, forge a weak JWT; implement RBAC + fix token handling.
 
@@ -229,7 +235,7 @@ Violations are treated as serious academic-integrity and conduct breaches. Stude
 | A02 Security Misconfiguration | Session 6 |
 | A03 Software Supply Chain Failures | Session 5 |
 | A04 Cryptographic Failures | Session 2 |
-| A05 Injection | Sessions 2–3 |
+| A05 Injection | Session 3 |
 | A06 Insecure Design | Sessions 1, 6 |
 | A07 Authentication Failures | Session 3 |
 | A08 Software or Data Integrity Failures | Session 5 |

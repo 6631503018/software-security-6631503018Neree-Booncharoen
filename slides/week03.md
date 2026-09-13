@@ -84,6 +84,14 @@ aes-modes
 
 ---
 
+## ECB in one picture
+
+![Two identical 16-byte plaintext blocks encrypted with ECB become two identical ciphertext blocks, so the repetition leaks (the ECB-penguin effect); the same input re-encrypts to the same bytes because there is no nonce. AES-GCM with a random nonce and auth tag produces different, random-looking blocks and detects tampering. Choosing AES is not the fix — AES-ECB leaks and AES-GCM under a hardcoded key is still CWE-798.](img/ecb-pattern-leak.svg)
+
+<!-- Leave this up during Capture the Hash. The static companion to the aes-modes sim: identical plaintext -> identical ciphertext (orange, '='), and GCM -> different blocks (blue, '='-crossed). Point at the two equal orange blocks: 'that equality is the leak.' Land on the footer: AES is a primitive, not a decision — mode, nonce, key source and RNG are four separate choices. ~3 min. -->
+
+---
+
 ## Capture the Hash — how cracking works
 
 ```bash
@@ -128,6 +136,24 @@ hashcat -m 0 hashes.txt rockyou.txt
 - **CWE-798** — hardcoded key
 
 <!-- Quick reference; they map lab findings to these. ~1 min. -->
+
+---
+
+## Four fixes — in the code
+
+```python
+# vulnerable_crypto.py                       ->  solution_skeleton.py
+md5(pw).hexdigest()           # CWE-916      ->  argon2.PasswordHasher().hash(pw)
+AES.new(key, AES.MODE_ECB)    # CWE-327      ->  AES.new(key, MODE_GCM, nonce=os.urandom(12))
+HARDCODED_KEY = b"0123..."    # CWE-798      ->  bytes.fromhex(os.environ["ENC_KEY_HEX"])
+random.choice("0123456789")   # CWE-330      ->  secrets.token_urlsafe(16)
+```
+
+- Four separate decisions — **KDF · cipher mode · key source · RNG** — not one "use better crypto"
+- "Use AES" answers none of them: AES-ECB leaks; AES-GCM under a hardcoded key is still CWE-798
+- Each fix makes the value **unguessable / authenticated / unique**, not merely "encrypted"
+
+<!-- The mechanism slide, parallel to Wk4 parameterize / Wk5 encode. Walk the four rows: md5 is fast + unsalted so a GPU cracks it -> argon2id is slow + salted; ECB leaks -> GCM adds nonce (unique) + tag (integrity); a hardcoded key means one leak breaks everything -> load it from the environment/KMS; random is predictable -> secrets is a CSPRNG. Punch line: crypto isn't one switch, it's four decisions, and a strong primitive with a weak decision is still broken. ~5 min. -->
 
 ---
 

@@ -66,5 +66,21 @@ def get_order(oid):
     return jsonify(order)
 
 
+@app.route("/api/admin")
+def admin():
+    # The role check below is the SAME one the vulnerable app had — it was never
+    # the bug. It fell only because current_user() accepted forged tokens. With the
+    # fixed current_user() above, a forged sub=admin is rejected (401) before this
+    # check runs, and a real non-admin token is refused here (403). One fix, in one
+    # place, closes every endpoint — no per-endpoint patch to forget.
+    try:
+        user = current_user()
+    except jwt.InvalidTokenError:
+        return jsonify(error="invalid token"), 401
+    if user != "admin":
+        return jsonify(error="forbidden"), 403
+    return jsonify(ok=True)
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)

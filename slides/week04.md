@@ -20,7 +20,7 @@ Software Security · Nutthakorn Chalaemwongwan
 - SQL injection — hands-on
 - Command injection
 - Defenses: parameterized queries + validation
-- 🎮 Game: **SQLi Boss Fight**
+- 🎮 Game: **SQLi Warm-up**
 
 <!-- Roadmap, 1 min. Tell them the one big idea (data becomes code) unifies SQLi, command injection, and even XSS next week. Lab = exploit DVWA/Juice Shop then patch it. -->
 
@@ -91,7 +91,33 @@ SELECT * FROM users WHERE username = 'alice'--' AND password = '...';
 - `--` comments out everything after it, including the password check
 - No trailing space, no `LIMIT` trick needed — this app is SQLite via `fetchone()`, not a MySQL row-count gate; **don't carry over MySQL-specific folklore** ("needs a space after `--`") — that's a different engine's quirk
 
-<!-- The worked example — slow down here. Decompose the payload token by token; this is exactly the SQLi Boss Fight's auth-bypass hit. A common wrong instinct is to add `OR 1=1` and a `LIMIT` clause copied from a MySQL tutorial — walk through why neither is needed against this SQLite app, and why the bare `'--` is what the worksheet actually uses. ~8 min. -->
+<!-- The worked example — slow down here. Decompose the payload token by token; this is exactly the SQLi Warm-up's auth-bypass hit. A common wrong instinct is to add `OR 1=1` and a `LIMIT` clause copied from a MySQL tutorial — walk through why neither is needed against this SQLite app, and why the bare `'--` is what the worksheet actually uses. ~8 min. -->
+
+---
+
+## The fix: parameterize — data stays data
+
+```python
+# concatenation: DB gets ONE finished string, decides grammar AFTER
+"...WHERE username = '" + user + "'"     # user = alice'--  ->  ' breaks out, code
+
+# parameterized: structure parsed and LOCKED first, value bound AFTER
+db.execute("...WHERE username = ? AND password = ?", (user, pw))
+```
+
+- `?` locks the query **structure before the input ever arrives**
+- `alice'--` is then bound as a **value** — it can no longer become SQL grammar
+- Escaping quotes patches symptoms; **this** is the actual fix for SQLi
+
+<!-- THE slide that makes SQLi click — spend time here, it's the one students miss. Draw both on the board. Concatenation: the DB receives one already-joined string and only THEN parses which characters are grammar vs. value, so the user's ' can retroactively become a string-terminator (the break-out they saw in the sim). Parameterized: the driver sends the template WITH the ?-placeholders to the DB and the DB parses+plans the structure FIRST — 'there are exactly two values here' is decided before any user byte is seen — then the values are shipped separately and slotted in as pure data. Because parsing already finished, alice'-- is just a 9-char username that matches no row; the ' and -- are inert. Punch line: parameterization doesn't *clean* the input, it *removes the input's power to change the grammar*. That's why it beats escaping/block-lists, which only try to spot bad characters. ~7 min. -->
+
+---
+
+## SQLi in one picture — break-out vs. bound value
+
+![Three SQL login queries stacked: normal input sits inside the string as data; the injected username alice'-- makes the user's quote close the string and -- comment out the password check so it logs in with no password; and the parameterised version binds alice'-- into a ? placeholder as pure data so the quote and dashes are inert and login fails.](img/sqli-parse-breakout.svg)
+
+<!-- The consolidation slide — leave it up while students work Task 1. It shows all three states at once (normal / injected / parameterised) with the token colours: blue = value/data, orange = attacker chars that became code, struck-through grey = the check that no longer runs. Point at the orange ' in row 2 — 'that one character is the whole bug' — then the ? in row 3 — 'the value can't reach the grammar'. Same picture the sqli-parse sim animates live. ~3 min. -->
 
 ---
 
@@ -142,6 +168,24 @@ system("ping -c 1 " . $_GET['host']);   // vulnerable
 
 ---
 
+## The fix: no shell — pass an argument vector
+
+```python
+# vulnerable: shell=True -> the OS shell parses the whole string
+subprocess.run("ping -c 1 " + host, shell=True)     # host = 8.8.8.8;cat /flag.txt
+
+# fixed: shell=False + argument array -> no shell, no metacharacters
+subprocess.run(["ping", "-c", "1", host], shell=False)   # + allow-list host
+```
+
+- `shell=True` hands your string to `/bin/sh`, which reads `;` `|` `$()` as **syntax**
+- An **arg vector** runs `ping` directly — `host` is one literal argument, never parsed
+- `8.8.8.8;cat /flag.txt` becomes one impossible "hostname"; the `;` is **inert**
+
+<!-- Same shape as the SQLi fix — separate command from data. shell=True actually spawns `/bin/sh -c "ping -c 1 <yourstring>"`, so sh does the parsing and every metacharacter (; | & $() backtick > <) is live -> command injection. With an argv list there is NO shell in the picture: execve runs the ping binary with argv = ["ping","-c","1",host], the kernel hands ping exactly four arguments, and host is a single opaque string -> ping tries to resolve "8.8.8.8;cat /flag.txt" as a hostname, fails, done. Nothing ever parses the ;. Exact parallel to parameterized queries: the structure (command + fixed flags) is fixed in code, the data (host) rides in a separate slot no interpreter re-parses. Add an allow-list on host as defense in depth. Punch line: you don't sanitize the metacharacters — you remove the shell that would interpret them. ~6 min. -->
+
+---
+
 ## Upload → RCE (a classic chain)
 
 The classic *chain*, attacker uploads `shell.php`:
@@ -184,11 +228,16 @@ The classic *chain*, attacker uploads `shell.php`:
 
 ![One untrusted request value reaches three different interpreters — SQL (CWE-89, fixed by a parameterized query), the OS shell (CWE-78, fixed by an argument vector with shell=False), and a filesystem write (CWE-434, fixed by an extension allow-list). One input filter cannot guard three grammars — the fix belongs at the sink that parses the value, not at the source.](img/injection-sinks.svg)
 
+- **SQL** (`WHERE username = <in>`) → parameterized query — bind the value
+- **Shell** (`ping … <in>`) → argument vector + `shell=False` — no shell to parse it
+- **Filesystem** (`save(<in>)`) → extension allow-list + store outside web root
+- One filter can't guard three grammars — **fix at each sink, not at the source**
+
 <!-- Synthesis slide — the SAME untrusted value from request.args/request.files is what feeds all three attacks just covered. Land on the closing line: escaping quotes does nothing to a semicolon in a shell, and a safe filename does nothing to SQL. Sets up "Defenses" as three separate fixes, not one. ~4 min. -->
 
 ---
 
-## ⚔️ Game — SQLi Boss Fight
+## ⚔️ Game — SQLi Warm-up
 
 Four hits against this week's own app — no filters to bypass, the app has none:
 
@@ -196,9 +245,9 @@ Four hits against this week's own app — no filters to bypass, the app has none
 2. UNION dump (steal all credentials)
 3. Command injection
 4. Unrestricted upload
-5. **Boss defeated:** run `solution_app.py`, prove all four attacks now fail, cite the exact fix line for each
+5. **Warm-up cleared:** run `solution_app.py`, prove all four attacks now fail, cite the exact fix line for each
 
-<!-- Explain before lab: this is NOT a tiered WAF-bypass ladder — it's 4 fixed attacks against app.py, then proving solution_app.py blocks all 4 ("boss defeated" = Task 5). No filter exists in the vulnerable app to bypass; don't set that expectation. DVWA/Juice Shop remain available as optional secondary targets, not the graded game. ~3 min. -->
+<!-- Explain before lab: this is NOT a tiered WAF-bypass ladder — it's 4 fixed attacks against app.py, then proving solution_app.py blocks all 4 ("warm-up cleared" = Task 5). No filter exists in the vulnerable app to bypass; don't set that expectation. DVWA/Juice Shop remain available as optional secondary targets, not the graded game. This is deliberately separate from the arena's own "SQLi Boss Fight" container challenge later in the session — same technique, different target, don't conflate the two names. ~3 min. -->
 
 ---
 
@@ -227,7 +276,7 @@ docker run --rm -p 80:80 vulnerables/web-dvwa   # optional extra target (or Juic
 - Proof the payload no longer works
 - **+ Audit the AI / EiPE / Prompt Problem** (see worksheet)
 
-<!-- Set expectations: before AND after code + proof. The AI-resilient tasks are part of the grade. Q6 of this week's quiz asks for their own payload — confirm the current worksheet's exact wording before promising a "personal flag" on stage; check with the team if that's still accurate. -->
+<!-- Set expectations: before AND after code + proof. The AI-resilient tasks are part of the grade. The weekly quiz no longer asks for their payload/flag (that question was dropped — quiz runs before the lab, so it couldn't be answered) — the payload + flag are required in the worksheet's Task 1 and Evidence & Integrity section instead. -->
 
 ---
 
