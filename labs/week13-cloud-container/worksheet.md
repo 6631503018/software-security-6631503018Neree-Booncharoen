@@ -11,7 +11,7 @@
 ## Part 1 — Student Information
 
 | Name | Student ID | Date | Group |
-|------|-----------|------|-------|
+|Neree Booncharoen|6631503018|------|-------|
 |      |           |      |       |
 
 ---
@@ -21,11 +21,15 @@
 Answer in your own words (2–4 sentences each).
 
 1. Explain the **shared-responsibility model**. In `harden.md` it says "the cloud provider secures *of* the cloud; you secure what you put *in* it." Give one concrete example of each side for an S3-backed app.
+Answer The shared-responsibility model means the cloud provider secures the cloud infrastructure, while the customer secures the applications and data they put in the cloud. For an S3-backed app, AWS secures the physical servers and storage infrastructure, while the developer must configure S3 bucket permissions correctly and prevent unauthorized access to uploaded files.
 2. `iam-policy-insecure.json` uses `"Action": "*"` and `"Resource": "*"`. Describe **why this violates least privilege** and map it to CWE-732 vs CWE-269 — what is the difference between the two CWEs here?
+Answer Using "Action": "*" and "Resource": "*" grants access to all actions and resources, violating least privilege. CWE-732 refers to incorrect permissions on critical resources, while CWE-269 refers to improper privilege management.
 3. The insecure Dockerfile bakes `ENV API_TOKEN=sk_live_...`. Explain how an attacker recovers that secret from a shipped image (name the `docker` commands) and why this is **CWE-798 / CWE-200**.
+Answer An attacker can use docker pull, docker inspect, and docker history --no-trunc to investigate an image and potentially recover a hardcoded API token. This is CWE-798 because the secret is hardcoded, and CWE-200 because sensitive information is exposed to unauthorized users.
 4. Why is `FROM python:latest` (CWE-1104/CWE-16) a security and reproducibility problem, and how does pinning to an `@sha256:` digest fix it?
+AnswerUsing FROM python:latest is risky because the image can change over time, introducing vulnerabilities or breaking reproducible builds. Pinning the image to an @sha256: digest ensures that the exact same image content is used for each build.
 5. What does a **distroless** base image remove (relative to `python:3.11-slim`), and how does that shrink the attack surface for an RCE or container-escape attacker?
-
+Answer
 ---
 
 ## Part 3 — Hands-on Lab (180 min)
@@ -74,9 +78,32 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:lates
 ## Part 4 — Reflection
 
 1. **Mapping.** For three findings, write the line of the artifact → CWE → OWASP 2025 A02, and the one-line fix.
+Answer:The mapping should connect the vulnerable artifact (where the problem was found), its CWE classification, the OWASP 2025 category, and the fix.
+Finding	Artifact → CWE	OWASP 2025	One-line fix
+F-01: Over-permissive IAM	IAM policy → CWE-250 (Execution with Unnecessary Privileges)	A02: Security Misconfiguration	Apply least-privilege IAM permissions and remove unnecessary access.
+F-02: Running container as root	Dockerfile → CWE-250 (Execution with Unnecessary Privileges)	A02: Security Misconfiguration	Run the container as a non-root user.
+F-03: Unnecessary packages in container	Dockerfile → CWE-1104 (Use of Unmaintained Third Party Components)	A02: Security Misconfiguration	Use a minimal, maintained distroless image to reduce the attack surface.
 2. **Real incident.** Briefly describe a real breach caused by a cloud/container misconfiguration (e.g., a public S3 bucket leak, or an over-permissive IAM role). What single control from this lab would have prevented it?
-3. **Best mitigation.** Of everything you did, which control gives the most risk reduction per unit of effort, and why? Argue for least-privilege IAM vs. distroless+non-root.
+Answer:Incident: Capital One suffered a major data breach in 2019, exposing information belonging to approximately 100 million customers and applicants.
 
+What happened:
+1. An attacker exploited a misconfiguration in a web application firewall (WAF).
+2. The attacker accessed AWS instance metadata and obtained temporary IAM credentials.
+3. The IAM role had excessive permissions to access S3 storage.
+4. The attacker used those permissions to access sensitive customer information. 
+   DOI+2
+Single control that could have limited the breach:
+
+Least-privilege IAM.
+
+If the WAF's IAM role had only the permissions it actually needed, compromising that role would not have provided broad access to sensitive S3 data.
+3. **Best mitigation.** Of everything you did, which control gives the most risk reduction per unit of effort, and why? Argue for least-privilege IAM vs. distroless+non-root.
+Answer:believe least-privilege IAM provides the greatest risk reduction per unit of effort for this lab.
+Comparison	Least-privilege IAM	Distroless + Non-root
+Main protection	Limits cloud resource access	Reduces container attack surface
+Security benefit	Limits unauthorized data access	Limits available tools and privileges
+Implementation	Restrict IAM policies and permissions	Change base image and user
+Impact	Reduces potential breach damage	Reduces container exploitation risk
 ---
 
 ## Grading rubric (100)
@@ -102,8 +129,13 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:lates
   *Flags are unique per student — submitting another student's flag is a violation. How to submit: **learn.zcr.ai/submit** (full guide: `SUBMISSION.md` in the repo root).*
 - **Explain in your own words** *(graded on your reasoning, not copied text):*
   1. What did you do, and **why did the vulnerability work**?
-  2. **Why does your fix actually stop it** — and what could still break it?
+   Answer:
 
+I tested the insecure configuration and found that it had too many permissions and weak security settings. The vulnerability worked because the system allowed more access than necessary, so an attacker could access things they should not be able to access.
+  2. **Why does your fix actually stop it** — and what could still break it?
+Answer:I fixed it by giving only the permissions that the system really needs. I also changed the container to run as a non-root user and used a distroless image to make it more secure.
+
+These changes make it harder for attackers to cause damage. However, the system could still have problems if the permissions are set incorrectly or if there are other vulnerabilities in the application.
 ---
 
 ## 🤖 Audit the AI (required)
@@ -111,8 +143,25 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:lates
 AI is a power tool you must **distrust** — you are graded on your *critique*, not the AI's answer.
 
 1. Ask an AI assistant to exploit **or** fix this week's vulnerability. Paste its full answer.
+Answer:asked an AI assistant how to fix the security problems in my Docker and cloud configuration.
+
+The AI suggested:
+- Use least-privilege IAM policies instead of giving too many permissions.
+- Run Docker containers as a non-root user.
+- Use distroless images to reduce unnecessary packages.
+- Remove unnecessary permissions and configurations to improve security.
 2. **Find what's wrong or risky** in it — insecure code, a subtly incomplete fix, a hallucinated API/function/CVE, a missed edge case, or wrong reasoning. Quote the exact line(s).
+Answer:The AI answer was too general and did not show the exact changes needed in the configuration files.
+
+For example:
+- "Use least-privilege IAM policies" does not explain which permissions should be removed.
+- "Run Docker containers as a non-root user" does not specify the user in the Dockerfile.
+- "Use distroless images" does not explain whether the application can still run correctly.
+The AI answer also did not include testing results to prove that the fixes actually work.
 3. Produce the **correct, verified** version yourself and explain in 2–3 sentences why the AI's output was insufficient.
+Answer:I fixed the configuration by changing the IAM policy to allow only the permissions required by the application. I also updated the Dockerfile to use a distroless image and run the application as a non-root user.
+
+The AI answer was insufficient because it only gave general suggestions without showing the actual implementation. My solution is better because I applied the changes to the configuration files and checked that the application could still run.
 
 > Disclose your AI use in the Part 1 table. This task counts toward your **Defense + Reflection** score.
 
@@ -121,6 +170,28 @@ AI is a power tool you must **distrust** — you are graded on your *critique*, 
 ## 🧠 Comprehension & Prompt (required)
 
 **A. Explain in Plain English (EiPE).** In 2–3 sentences, in your own words, describe what this week's vulnerable code/endpoint actually *does* and *why it is exploitable* — explain the mechanism, don't dump jargon.
+Answer:The vulnerable configuration gives the application more permissions than it actually needs. If an attacker gains access to the application, they may also access other cloud resources because the permissions are not properly restricted. This makes the system more dangerous if something goes wrong.
 
 **B. Prompt Problem.** Write a **single prompt** that makes an AI produce a *correct, secure* fix for one finding. Run it: does the exploit now fail? If not, refine the prompt and try again. Submit the **final prompt + the verified result**.
+Answer:I have a Docker and cloud security configuration with excessive IAM permissions. Please review the insecure configuration and fix it.
+
+Requirements:
+
+Follow the principle of least privilege.
+
+Give the application only the permissions it really needs.
+
+Do not use wildcard permissions such as * unless absolutely necessary.
+
+Update the Dockerfile to use a non-root user.
+
+Use a minimal distroless image where compatible with the application.
+
+Keep the application working correctly.
+
+Explain every change and why it improves security.
+
+Do not invent APIs, permissions, or configuration options.
+
+Provide the corrected configuration and explain how to test that the security fixes work.
 *Graded on the prompt's precision and your verification — this trains problem decomposition and AI literacy (Denny et al. 2024).*
