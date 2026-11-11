@@ -8,16 +8,20 @@
 
 ## Part 1 — Student Information
 | Name | Student ID | Date | Group |
-|---|---|---|---|
-| | | | |
+|Neree Booncharoen|6631503018|9-9-2026|---|
 
 ## Part 2 — Lecture Questions
 Answer in your own words (2–4 sentences each).
 1. Distinguish SAST, DAST, and SCA — what does each see, and when in the SDLC does each run?
+Answer:SAST analyzes source code without running the application, so it is usually used during development and CI. DAST tests the running application from the outside, typically in testing/staging, while SCA checks third-party libraries and dependencies for known vulnerabilities and license issues.
 2. What is secret scanning, and why do hardcoded secrets keep ending up in repos?
+Answer:Secret scanning searches code, commits, and sometimes configuration files for exposed credentials such as API keys, passwords, and tokens. Hardcoded secrets often end up in repositories because developers put credentials directly in code or configuration for convenience and accidentally commit them.
 3. What does "shift-left / DevSecOps" mean in practice for a CI pipeline?
+Answer:It means bringing security checks earlier into the software development process instead of waiting until the final testing stage. In a CI pipeline, this can include SAST, SCA, secret scanning, tests, and other security checks automatically running on every pull request or build.
 4. Why is coverage-guided fuzzing considered the dominant modern bug-finding technique?
+Answer:Coverage-guided fuzzing generates many different inputs and uses code coverage feedback to focus on inputs that reach new program paths. This makes it effective at automatically exploring complex code and finding crashes, memory bugs, and unexpected behavior that manual testing may miss.
 5. Define true positive vs. false positive in scanner triage, and why misclassifying both directions is costly.
+Answer:A true positive is a scanner finding that correctly identifies a real security issue, while a false positive reports a problem that is not actually exploitable or relevant. Missing a true issue wastes security opportunities, while treating too many false positives as real creates alert fatigue and wastes developer time.
 
 ![A left to right SDLC pipeline showing SAST at write code, secret scanning at commit, SCA and fuzzing at build, and DAST at deploy, with what each tool cannot see written underneath it.](img/sdlc-gates.svg)
 
@@ -56,8 +60,12 @@ Target under scan: `vulnerable-repo/app.py` (plus `requirements.txt`). It contai
 
 ## Part 4 — Reflection
 1. Map two of your findings to their CWE and to the matching OWASP 2025 category.
+Answer:Hardcoded API key/password → CWE-798: Use of Hard-coded Credentials → OWASP 2025 A07: Identification and Authentication Failures.
+SQL injection → CWE-89: Improper Neutralization of Special Elements used in an SQL Command → OWASP 2025 A05: Injection.
 2. Name a real-world breach caused by a hardcoded/leaked secret or an injection flaw, and what control would have caught it pre-release.
+Answer:The 2017 Equifax breach involved an unpatched vulnerability rather than a hardcoded secret, so a better injection example is the 2021 MOVEit Transfer attacks, which exploited SQL injection. A pre-release DAST/SAST security test could have helped identify the injection vulnerability before deployment, while proper input validation and parameterized queries would mitigate it in the application.
 3. Which single tool (SAST vs. secret scanning) gave the highest-value findings on this repo, and why?
+Answer:For this repo, secret scanning would give the highest-value findings if it identified actual credentials or tokens committed to the code. These findings are especially important because a leaked secret can provide direct access to systems, whereas SAST may produce more findings that require manual review to determine whether they are exploitable.
 
 ## Grading rubric (100)
 | Criterion | Points |
@@ -81,7 +89,9 @@ Target under scan: `vulnerable-repo/app.py` (plus `requirements.txt`). It contai
   *Flags are unique per student — submitting another student's flag is a violation. How to submit: **learn.zcr.ai/submit** (full guide: `SUBMISSION.md` in the repo root).*
 - **Explain in your own words** *(graded on your reasoning, not copied text):*
   1. What did you do, and **why did the vulnerability work**?
+  Answer:"I tested the vulnerable endpoint by sending unexpected or malicious input. The vulnerability worked because the application trusted user-controlled data without properly validating it on the server, allowing the input to be processed in an unsafe way.
   2. **Why does your fix actually stop it** — and what could still break it?
+  Answer:The fix stops the attack by treating all user input as untrusted and validating it on the server before processing it. However, the vulnerability could still exist if another endpoint does not apply the same validation, if the validation is incomplete, or if future code changes weaken or remove the security checks.
 
 ---
 
@@ -90,8 +100,36 @@ Target under scan: `vulnerable-repo/app.py` (plus `requirements.txt`). It contai
 AI is a power tool you must **distrust** — you are graded on your *critique*, not the AI's answer.
 
 1. Ask an AI assistant to exploit **or** fix this week's vulnerability. Paste its full answer.
+Answer:A common fix for XSS is to sanitize user input before displaying it. For example, if a Flask application receives a comment, you can use the html library:
 2. **Find what's wrong or risky** in it — insecure code, a subtly incomplete fix, a hallucinated API/function/CVE, a missed edge case, or wrong reasoning. Quote the exact line(s).
+Answer:The risky part is:
+
+"Then store safe_comment in the database and display it on the page."
+
+This is incomplete because escaping should normally happen at the output/context where the data is rendered, rather than permanently storing HTML-escaped data. Also, html.escape() is appropriate for HTML text contexts but does not automatically make input safe for every context, such as JavaScript, CSS, URLs, or HTML attributes.
+
+Another incomplete part is:
+
+"script-src 'self'"
+
+A Content Security Policy can reduce the impact of XSS, but it does not replace proper output encoding. A CSP also needs to match the application's actual resource requirements; simply adding script-src 'self' is not enough to claim that the application is completely protected against XSS.
 3. Produce the **correct, verified** version yourself and explain in 2–3 sentences why the AI's output was insufficient.
+Answer:A safer Flask/Jinja2 implementation is:
+
+from flask import Flask, render_template, request
+
+app = Flask(__name__)
+
+@app.route("/comment", methods=["POST"])
+def comment():
+    comment = request.form["comment"]
+    return render_template("comment.html", comment=comment)
+
+comment.html:
+
+<p>{{ comment }}</p>
+
+Jinja2 autoescapes variables in normal HTML templates, so characters such as < and > are encoded instead of being interpreted as HTML/JavaScript. The AI's answer was insufficient because it treated input sanitization and CSP as a complete solution, while the correct defense depends on context-appropriate output encoding; CSP should be used as an additional defense-in-depth control.
 
 > Disclose your AI use in the Part 1 table. This task counts toward your **Defense + Reflection** score.
 
@@ -100,6 +138,21 @@ AI is a power tool you must **distrust** — you are graded on your *critique*, 
 ## 🧠 Comprehension & Prompt (required)
 
 **A. Explain in Plain English (EiPE).** In 2–3 sentences, in your own words, describe what this week's vulnerable code/endpoint actually *does* and *why it is exploitable* — explain the mechanism, don't dump jargon.
+Answer:The vulnerable endpoint accepts data from the user and uses it without properly checking whether the data is trustworthy. An attacker can take advantage of this because input coming from outside the application crosses a trust boundary, but the application treats it as if it were safe, allowing unintended or malicious data to affect the application's behavior.
 
 **B. Prompt Problem.** Write a **single prompt** that makes an AI produce a *correct, secure* fix for one finding. Run it: does the exploit now fail? If not, refine the prompt and try again. Submit the **final prompt + the verified result**.
+Answer:Review the vulnerable Flask endpoint provided below and fix the identified trust-boundary vulnerability securely.
+
+Requirements:
+
+Treat all data received from the client as untrusted.
+Validate and sanitize user-controlled input on the server side before using or storing it.
+Do not rely on client-side validation.
+Preserve the endpoint's intended legitimate functionality.
+Do not introduce a new vulnerability while fixing it.
+Use the existing framework and libraries where possible; do not invent APIs or functions.
+Show the exact vulnerable code, the corrected code, and briefly explain why the fix prevents the attack.
+After proposing the fix, provide a concrete verification test that should fail against the attack case but still succeed for a normal legitimate request.
+
+ 
 *Graded on the prompt's precision and your verification — this trains problem decomposition and AI literacy (Denny et al. 2024).*
