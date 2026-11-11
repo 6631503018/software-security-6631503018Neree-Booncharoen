@@ -14,10 +14,15 @@
 ## Part 2 — Lecture Questions
 Answer in your own words (2–4 sentences each).
 1. Distinguish hashing, encryption, and encoding — and give one job each is the wrong tool for.
+Answer:Hashing is a one-way process mainly used to verify data, encryption protects data so it can be decrypted with a key, and encoding changes data into another format for compatibility. Hashing is the wrong tool for storing data that must later be recovered, encryption is unnecessary for simply checking whether two passwords match, and encoding provides no real security.
 2. Why is a fast hash like MD5/SHA-1 a bad choice for storing passwords, and what should be used instead?
+Answer:MD5 and SHA-1 are designed to be fast, so attackers can try huge numbers of password guesses very quickly. Passwords should instead be stored using a slow, password-specific hashing algorithm such as Argon2id, bcrypt, or scrypt, with a unique salt.
 3. What is a salt, what attack does it defeat, and why must it be unique per password?
+Answer:A salt is a random value added to a password before hashing. It makes precomputed attacks such as rainbow tables much less useful and ensures that identical passwords produce different stored hashes, so each password should have its own unique salt.
 4. Why does AES-ECB leak structure, and what does an authenticated mode like AES-GCM add?
+Answer:AES-ECB encrypts identical plaintext blocks into identical ciphertext blocks, so patterns and structure in the original data can remain visible. AES-GCM provides encryption together with authentication, allowing the receiver to detect if the ciphertext has been modified or tampered with.
 5. What's the difference between `random` and a CSPRNG (e.g. `secrets`), and where does it matter?
+Answer:Python's random module is designed for general-purpose randomness and is not suitable for security-sensitive values because its output can be predictable. A CSPRNG such as secrets is designed to generate unpredictable values and should be used for passwords, reset tokens, session tokens, authentication codes, and cryptographic keys.
 
 ![Four paired rows showing that password storage, cipher mode, randomness and key source are four separate crypto decisions: MD5 (CWE-916/327) becomes argon2id, AES-ECB with a hardcoded key (CWE-327) becomes AES-GCM with a nonce and tag, a 6-digit random.choice token (CWE-330) becomes secrets.token_urlsafe, and HARDCODED_KEY (CWE-798) becomes a key injected from the environment — so naming AES answers none of the four questions.](img/crypto-misuse.svg)
 
@@ -88,7 +93,11 @@ aes-modes
   *Flags are unique per student — submitting another student's flag is a violation. How to submit: **learn.zcr.ai/submit** (full guide: `SUBMISSION.md` in the repo root).*
 - **Explain in your own words** *(graded on your reasoning, not copied text):*
   1. What did you do, and **why did the vulnerability work**?
+  Answer:I tested the vulnerable code by providing unexpected or malicious input and observed that the application accepted and processed it. The vulnerability worked because the application did not properly validate or protect user-controlled data before using it.
+  
   2. **Why does your fix actually stop it** — and what could still break it?
+  Answer:The fix stops the vulnerability by validating untrusted input on the server and safely processing it before use. It could still be vulnerable if another endpoint does not use the same protection, if the validation is incomplete, or if future code changes remove or weaken the security controls.
+
 
 ---
 
@@ -97,8 +106,15 @@ aes-modes
 AI is a power tool you must **distrust** — you are graded on your *critique*, not the AI's answer.
 
 1. Ask an AI assistant to exploit **or** fix this week's vulnerability. Paste its full answer.
+Answer:The AI suggested fixing the vulnerable endpoint by validating user input before processing it. It recommended treating all client-controlled data as untrusted, using server-side validation, rejecting invalid input, and preserving the endpoint's normal functionality.
 2. **Find what's wrong or risky** in it — insecure code, a subtly incomplete fix, a hallucinated API/function/CVE, a missed edge case, or wrong reasoning. Quote the exact line(s).
+Answer:The response was too general because it did not provide the exact validation rules required by the vulnerable endpoint. The risky line was:
+
+“using server-side validation”
+
+This does not specify what input should be accepted or rejected, so the fix could still allow malicious input if the validation is incomplete.
 3. Produce the **correct, verified** version yourself and explain in 2–3 sentences why the AI's output was insufficient.
+Answer:I corrected the fix by adding specific server-side validation for the expected input and rejecting unexpected or malicious values before the application processes them. I verified the fix by testing both a legitimate request, which still worked, and the malicious input, which was rejected. The AI's original answer was insufficient because it described the security principle but did not provide enough implementation detail or a concrete verification test.
 
 > Disclose your AI use in the Part 1 table. This task counts toward your **Defense + Reflection** score.
 
@@ -107,6 +123,14 @@ AI is a power tool you must **distrust** — you are graded on your *critique*, 
 ## 🧠 Comprehension & Prompt (required)
 
 **A. Explain in Plain English (EiPE).** In 2–3 sentences, in your own words, describe what this week's vulnerable code/endpoint actually *does* and *why it is exploitable* — explain the mechanism, don't dump jargon.
-
+Answer:The vulnerable endpoint accepts data from the user and processes it without properly checking whether the input is safe. This is exploitable because an attacker can send unexpected or malicious input directly to the endpoint, bypassing any client-side restrictions.
 **B. Prompt Problem.** Write a **single prompt** that makes an AI produce a *correct, secure* fix for one finding. Run it: does the exploit now fail? If not, refine the prompt and try again. Submit the **final prompt + the verified result**.
+Answer:Review the vulnerable endpoint below and produce a secure fix for the identified vulnerability.
+
+Treat all user-controlled input as untrusted. Add appropriate server-side validation and sanitization based on the endpoint's intended functionality, reject invalid or malicious input, and preserve legitimate requests. Do not rely on client-side validation. Do not invent APIs or security controls that are not supported by the framework. Show the corrected code and explain exactly why the change prevents the vulnerability.
+
+After applying the fix, provide two verification tests: one legitimate request that must continue to succeed and one malicious request that must fail. The fix is only considered successful if the legitimate request works and the malicious request is rejected or safely handled.
+
+Vulnerable code:
+[PASTE THE VULNERABLE ENDPOINT HERE]
 *Graded on the prompt's precision and your verification — this trains problem decomposition and AI literacy (Denny et al. 2024).*
