@@ -28,6 +28,7 @@ def notes():
     con.close()
     return jsonify(rows)
 
+
 @app.route("/upload", methods=["POST"])
 def upload():
     f = request.files["file"]
